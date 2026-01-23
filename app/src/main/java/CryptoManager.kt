@@ -1,6 +1,10 @@
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import java.io.InputStream
+import java.io.OutputStream
 import java.security.KeyStore
+import java.security.SecureRandom
+import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 
@@ -18,15 +22,20 @@ object CryptoManager  {
         else{
             val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES,
                 "AndroidKeyStore")
+            val keyParameter = KeyGenParameterSpec.Builder("secret_key",
+                KeyProperties.PURPOSE_DECRYPT or
+                KeyProperties.PURPOSE_ENCRYPT)
+                .setBlockModes(BLOCKMODE)
+                .setEncryptionPaddings(PADDING)
+                .build()
 
-           val keyGenParameterSpec = KeyGenParameterSpec.Builder("secret_key",
-               KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
-               .setBlockModes(BLOCKMODE)
-               .setEncryptionPaddings(PADDING)
-               .build()
+            keyGenerator.init(keyParameter)
 
-            keyGenerator.init(keyGenParameterSpec)
             return  keyGenerator.generateKey()
     }
 }
+    fun encrypt(inputStream: InputStream, outputStream: OutputStream){
+//        val cipher = Cipher.ENCRYPT_MODE
+//        InputStream.IV
+    }
 }
