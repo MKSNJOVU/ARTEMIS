@@ -10,8 +10,8 @@ import javax.crypto.SecretKey
 
 object CryptoManager  {
     const val Algorithm = KeyProperties.KEY_ALGORITHM_AES
-    const val BLOCKMODE= KeyProperties.BLOCK_MODE_CBC
-    const val PADDING = KeyProperties.ENCRYPTION_PADDING_PKCS7
+    const val BLOCKMODE= KeyProperties.BLOCK_MODE_GCM
+    const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
 
     fun getKey(): SecretKey {
         val keyStore = KeyStore.getInstance("AndroidKeyStore")
@@ -35,7 +35,8 @@ object CryptoManager  {
     }
 }
     fun encrypt(inputStream: InputStream, outputStream: OutputStream){
-//        val cipher = Cipher.ENCRYPT_MODE
-//        InputStream.IV
+
+        val cipher = Cipher.ENCRYPT_MODE
+        val iv = ByArr
     }
 }
