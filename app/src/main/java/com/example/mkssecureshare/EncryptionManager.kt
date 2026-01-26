@@ -17,17 +17,27 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 object EncryptionManager {
+    // KeyStore config
+
     const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
     const val BLOCKMODE = KeyProperties.BLOCK_MODE_GCM
     const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
-
     const val ALIAS = "secret_key"
     const val  PROVIDER = "AndroidKeyStore"
+
+    // AES-GCM Config
+    const val KEY_SIZE = 256
+    const val IV_SIZE = 12
+    const val TAG_SIZE = 128
+
+
+    // Argon2 Config
     const val ITERATIONS = 3
     const val MEMORY = 65536 // ~64 MB
     const val PARALLELISM = 1
     const val TYPE = Argon2Parameters.ARGON2_id
-
+    // Cipher Config
+    private const val TRANSFORMATION = "AES/GCM/NoPadding"
 
 
     // Helper function for devices with or without StrongBox
@@ -43,6 +53,7 @@ object EncryptionManager {
         )
             .setBlockModes(BLOCKMODE)
             .setEncryptionPaddings(PADDING)
+            .setKeySize(KEY_SIZE)
             if (useStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
                 builder.setIsStrongBoxBacked(true)
             }
@@ -88,7 +99,7 @@ object EncryptionManager {
         val argon = Argon2BytesGenerator()
         argon.init(argonParameters) // initialize Argon2 from Parameters
 
-        val argonByteArray = ByteArray(32)
+        val argonByteArray = ByteArray(KEY_SIZE/8)
         argon.generateBytes(password,argonByteArray)
         val secretKey = SecretKeySpec(argonByteArray, "AES")
 
@@ -98,13 +109,13 @@ object EncryptionManager {
     fun encrypt(inputStream: InputStream, outputStream: OutputStream, byteArray: ByteArray) {
         // Creating a random IV
         val secureRandom = SecureRandom()
-        val iv = ByteArray(12)
+        val iv = ByteArray(IV_SIZE)
         secureRandom.nextBytes(iv)
 
         // Creating Cipher encrypt mode and AES GCM Parameters
-        val cipherInstance = Cipher.getInstance("AES/GCM/NoPadding")
+        val cipherInstance = Cipher.getInstance(TRANSFORMATION)
         val cipherMode = Cipher.ENCRYPT_MODE
-        val cipherParameter = GCMParameterSpec(128, iv)
+        val cipherParameter = GCMParameterSpec(TAG_SIZE, iv)
         cipherInstance.init(cipherMode, getKey(), cipherParameter)
 
         // Writing to OutputStream
