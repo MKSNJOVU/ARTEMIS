@@ -1,7 +1,7 @@
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import androidx.annotation.RequiresApi
+import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.io.InputStream
 import java.io.OutputStream
@@ -10,48 +10,59 @@ import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
-import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
+import android.security.keystore.StrongBoxUnavailableException
 
 
 object EncryptionManager {
-    const val Algorithm = KeyProperties.KEY_ALGORITHM_AES
+    const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
     const val BLOCKMODE = KeyProperties.BLOCK_MODE_GCM
     const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
-    const val KEYLENGTH = 256
     const val ITERATIONS = 3
-    const val MEMORY = 1024000 // ~1 GiB
-    const val PARALLELISM = 4
+    const val MEMORY = 65536 // ~64 MB
+    const val PARALLELISM = 1
+    const val VERSION = 2
 
-    // Get or Create the SecretKey
-    @RequiresApi(Build.VERSION_CODES.P)
+
+
+    // Helper function for devices with or without StrongBox
+    private fun generateNewKey(useStrongBox: Boolean): SecretKey{
+        val keyGenerator = KeyGenerator.getInstance(ALGORITHM,
+            "AndroidKeyStore"
+        )
+
+        val builder = KeyGenParameterSpec.Builder(
+            "secret_key",
+            KeyProperties.PURPOSE_DECRYPT or
+                    KeyProperties.PURPOSE_ENCRYPT
+        )
+            .setBlockModes(BLOCKMODE)
+            .setEncryptionPaddings(PADDING)
+            if (useStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
+                builder.setIsStrongBoxBacked(true)
+            }
+            keyGenerator.init(builder.build())
+            return keyGenerator.generateKey()
+
+    }
+    // Get the Key
     fun getKey(): SecretKey {
         val keyStore = KeyStore.getInstance("AndroidKeyStore")
         keyStore.load(null)
 
         if (keyStore.containsAlias("secret_key"))
             return keyStore.getKey("secret_key", null) as SecretKey
-        else {
-            val keyGenerator = KeyGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES,
-                "AndroidKeyStore"
-            )
-            val keyParameter = KeyGenParameterSpec.Builder(
-                "secret_key",
-                KeyProperties.PURPOSE_DECRYPT or
-                        KeyProperties.PURPOSE_ENCRYPT
-            )
-                .setBlockModes(BLOCKMODE)
-                .setEncryptionPaddings(PADDING)
-                .setIsStrongBoxBacked(true)
-                .build()
 
-            keyGenerator.init(keyParameter)
-
-            return keyGenerator.generateKey()
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
+            try {
+                return generateNewKey( true)
+            } catch (e: StrongBoxUnavailableException){
+                // StrongBox not available, use regular KeyStore
+            }
         }
+            return generateNewKey(false)
+
     }
 
     // Generate a salt for passwords
@@ -64,23 +75,21 @@ object EncryptionManager {
 
     // Derive the Key from User provided password
     fun deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey {
-        val secretKeyFactory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val keySpec = PBEKeySpec(password, salt, ITERATIONS, KEYLENGTH)
-        val generateSecret = secretKeyFactory.generateSecret(keySpec)
-        val secretByteArray = generateSecret.encoded
-        val secretKeySpec = SecretKeySpec(secretByteArray,"AES")
-
-        val builder = Argon2Parameters.Builder()
+        val builder = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
         builder.withIterations(ITERATIONS)
         builder.withMemoryAsKB(MEMORY)
         builder.withParallelism(PARALLELISM)
         builder.withSalt(salt)
-        builder.withSecret(pepper)
-        builder.withVersion(1) // Argon2i
-        builder.withType(Argon2Parameters.ARGON2_i)
-        val parameters = builder.build()
+        builder.withVersion(VERSION) // Argon2_id
+        val argonParameters = builder.build() // build Argon from parameters
+        val argon = Argon2BytesGenerator()
+        argon.init(argonParameters) // initialize Argon2 from Parameters
 
-        //return secretKeySpec
+        val argonByteArray = ByteArray(32)
+        argon.generateBytes(password,argonByteArray)
+        val secretKey = SecretKeySpec(argonByteArray,"AES")
+
+        return secretKey
     }
 
     fun encrypt(inputStream: InputStream, outputStream: OutputStream, byteArray: ByteArray) {
