@@ -26,7 +26,7 @@ Build an Android file encryption app using **AES-GCM** (Galois/Counter Mode) aut
 **Mode 1: Android KeyStore (Local)**
 
 - Hardware-backed (Titan M2, StrongBox)
-- Key alias: `secureshare_master_key`
+- Key alias: `secret_key`
 - Files only decryptable on originating device
 
 **Mode 2: Password-Derived (Portable)**
