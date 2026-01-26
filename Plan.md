@@ -9,12 +9,14 @@ Build an Android file encryption app using **AES-GCM** (Galois/Counter Mode) aut
 ## Technical Specifications
 
 ### Encryption
+
 - **Algorithm**: AES-256-GCM
 - **IV Size**: 12 bytes (96 bits) - GCM standard
 - **Auth Tag**: 128 bits - appended automatically by GCM
 - **Streaming**: Process files in chunks (8KB buffers)
 
 ### File Format
+
 ```
 [IV: 12 bytes][Ciphertext][Auth Tag: 16 bytes]
 ```
@@ -22,15 +24,26 @@ Build an Android file encryption app using **AES-GCM** (Galois/Counter Mode) aut
 ### Key Management
 
 **Mode 1: Android KeyStore (Local)**
+
 - Hardware-backed (Titan M2, StrongBox)
 - Key alias: `secureshare_master_key`
 - Files only decryptable on originating device
 
 **Mode 2: Password-Derived (Portable)**
-- Algorithm: PBKDF2-HMAC-SHA256
-- Iterations: 310,000 (OWASP 2023 recommendation)
+
+- Algorithm: Argon2id (via Bouncy Castle)
+- Memory: 64 MB
+- Iterations: 3
+- Parallelism: 1
 - Salt: 16 bytes, stored with encrypted file
 - Enables cross-device sharing
+
+### Dependencies
+
+```kotlin
+// In app/build.gradle.kts
+implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+```
 
 ---
 
@@ -39,6 +52,7 @@ Build an Android file encryption app using **AES-GCM** (Galois/Counter Mode) aut
 **File**: `EncryptionManager.kt`
 
 ### 1.1 Constants
+
 ```
 Concepts to look up:
 - KeyProperties.KEY_ALGORITHM_AES
@@ -48,6 +62,7 @@ Concepts to look up:
 ```
 
 ### 1.2 KeyStore Key Management
+
 ```
 Function: getOrCreateKeyStoreKey()
 
@@ -59,17 +74,21 @@ Concepts to look up:
 - setIsStrongBoxBacked() for Titan M2
 ```
 
-### 1.3 Password Key Derivation
+### 1.3 Password Key Derivation (Argon2id)
+
 ```
 Function: deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey
 
 Concepts to look up:
-- SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-- PBEKeySpec(password, salt, iterations, keyLength)
+- Argon2BytesGenerator (Bouncy Castle)
+- Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
+- Parameters: memory (64MB), iterations (3), parallelism (1)
 - SecureRandom for salt generation
+- SecretKeySpec to wrap derived bytes as AES key
 ```
 
 ### 1.4 Encrypt Function
+
 ```
 Function: encrypt(
     inputStream: InputStream,
@@ -95,6 +114,7 @@ Concepts to look up:
 ```
 
 ### 1.5 Decrypt Function
+
 ```
 Function: decrypt(
     inputStream: InputStream,
@@ -124,6 +144,7 @@ Concepts to look up:
 **File**: `MainActivity.kt` (or separate `FileProcessor.kt`)
 
 ### 2.1 File Selection
+
 ```
 Concepts to look up:
 - registerForActivityResult()
@@ -133,6 +154,7 @@ Concepts to look up:
 ```
 
 ### 2.2 Stream Handling
+
 ```
 Function: processFile(uri: Uri, encrypt: Boolean)
 
@@ -144,6 +166,7 @@ Concepts to look up:
 ```
 
 ### 2.3 User Choice Dialog
+
 ```
 After encryption, prompt:
 - "Keep original file"
@@ -161,6 +184,7 @@ Concepts to look up:
 **Files**: `activity_main.xml`, `MainActivity.kt`
 
 ### 3.1 Layout Elements
+
 - Encrypt button
 - Decrypt button
 - Status TextView (feedback)
@@ -168,6 +192,7 @@ Concepts to look up:
 - Password input field (visible when Password mode selected)
 
 ### 3.2 Click Handlers
+
 ```
 Concepts to look up:
 - findViewById<Button>()
@@ -180,7 +205,9 @@ Concepts to look up:
 ## Phase 4: FileProvider (Sharing)
 
 ### 4.1 Provider Paths XML
+
 **Create**: `res/xml/provider_paths.xml`
+
 ```
 Concepts to look up:
 - <files-path> element
@@ -188,7 +215,9 @@ Concepts to look up:
 ```
 
 ### 4.2 Manifest Entry
+
 **Edit**: `AndroidManifest.xml`
+
 ```
 Concepts to look up:
 - <provider> element
@@ -198,6 +227,7 @@ Concepts to look up:
 ```
 
 ### 4.3 Share Function
+
 ```
 Function: shareFile(file: File)
 
@@ -213,6 +243,7 @@ Concepts to look up:
 ## Phase 5: Testing & Verification
 
 ### Manual Tests
+
 1. Encrypt small file → decrypt → compare to original
 2. Encrypt large file (100MB+) → verify no memory crash
 3. KeyStore mode: encrypted file unreadable on other devices
@@ -220,6 +251,7 @@ Concepts to look up:
 5. Wrong password → verify AEADBadTagException
 
 ### Verification Commands
+
 ```bash
 # Build debug APK
 ./gradlew assembleDebug
@@ -236,6 +268,7 @@ Concepts to look up:
 ## Session Workflow
 
 Each coding session:
+
 1. **I present**: Current task + concepts to look up
 2. **You research**: Reference Kotlin/Android/Crypto documentation
 3. **You code**: Write implementation by hand
