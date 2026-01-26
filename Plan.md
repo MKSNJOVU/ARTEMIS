@@ -42,7 +42,7 @@ Build an Android file encryption app using **AES-GCM** (Galois/Counter Mode) aut
 
 ```kotlin
 // In app/build.gradle.kts
-implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+implementation("org.bouncycastle:bcprov-jdk18on:1.83")
 ```
 
 ---
