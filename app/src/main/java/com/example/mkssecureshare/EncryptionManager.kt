@@ -1,6 +1,9 @@
+package com.example.mkssecureshare
+
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
+import android.security.keystore.StrongBoxUnavailableException
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.io.InputStream
@@ -12,8 +15,6 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import android.security.keystore.StrongBoxUnavailableException
-
 
 object EncryptionManager {
     const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
@@ -25,12 +26,12 @@ object EncryptionManager {
     const val ITERATIONS = 3
     const val MEMORY = 65536 // ~64 MB
     const val PARALLELISM = 1
-    const val VERSION = 2
+    const val TYPE = Argon2Parameters.ARGON2_id
 
 
 
     // Helper function for devices with or without StrongBox
-    private fun generateNewKey(useStrongBox: Boolean): SecretKey{
+    private fun generateNewKey(useStrongBox: Boolean): SecretKey {
         val keyGenerator = KeyGenerator.getInstance(ALGORITHM,
             PROVIDER
         )
@@ -78,19 +79,18 @@ object EncryptionManager {
 
     // Derive the Key from User provided password
     fun deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey {
-        val builder = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
-        builder.withIterations(ITERATIONS)
-        builder.withMemoryAsKB(MEMORY)
-        builder.withParallelism(PARALLELISM)
-        builder.withSalt(salt)
-        builder.withVersion(VERSION) // Argon2_id
+        val builder = Argon2Parameters.Builder(TYPE)
+            .withIterations(ITERATIONS)
+            .withMemoryAsKB(MEMORY)
+            .withParallelism(PARALLELISM)
+            .withSalt(salt)
         val argonParameters = builder.build() // build Argon from parameters
         val argon = Argon2BytesGenerator()
         argon.init(argonParameters) // initialize Argon2 from Parameters
 
         val argonByteArray = ByteArray(32)
         argon.generateBytes(password,argonByteArray)
-        val secretKey = SecretKeySpec(argonByteArray,"AES")
+        val secretKey = SecretKeySpec(argonByteArray, "AES")
 
         return secretKey
     }
