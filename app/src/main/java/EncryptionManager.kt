@@ -19,6 +19,9 @@ object EncryptionManager {
     const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
     const val BLOCKMODE = KeyProperties.BLOCK_MODE_GCM
     const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
+
+    const val ALIAS = "secret_key"
+    const val  PROVIDER = "AndroidKeyStore"
     const val ITERATIONS = 3
     const val MEMORY = 65536 // ~64 MB
     const val PARALLELISM = 1
@@ -29,11 +32,11 @@ object EncryptionManager {
     // Helper function for devices with or without StrongBox
     private fun generateNewKey(useStrongBox: Boolean): SecretKey{
         val keyGenerator = KeyGenerator.getInstance(ALGORITHM,
-            "AndroidKeyStore"
+            PROVIDER
         )
 
         val builder = KeyGenParameterSpec.Builder(
-            "secret_key",
+            ALIAS,
             KeyProperties.PURPOSE_DECRYPT or
                     KeyProperties.PURPOSE_ENCRYPT
         )
@@ -48,11 +51,11 @@ object EncryptionManager {
     }
     // Get the Key
     fun getKey(): SecretKey {
-        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        val keyStore = KeyStore.getInstance(PROVIDER)
         keyStore.load(null)
 
-        if (keyStore.containsAlias("secret_key"))
-            return keyStore.getKey("secret_key", null) as SecretKey
+        if (keyStore.containsAlias(ALIAS))
+            return keyStore.getKey(ALIAS, null) as SecretKey
 
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
             try {
