@@ -21,8 +21,10 @@ object EncryptionManager {
     // Exception TAG
     const val TAG = "EncryptionManager"
 
+    fun encrypt(inputStream: InputStream, outputStream: OutputStream,
+                mode: KeyMode, byteArray: ByteArray,
+                password: CharArray) {
 
-    fun encrypt(inputStream: InputStream, outputStream: OutputStream, mode: KeyMode, byteArray: ByteArray, password: CharArray? = null) {
         // Creating a random IV
         val secureRandom = SecureRandom()
         val iv = ByteArray(IV_SIZE)
@@ -35,9 +37,21 @@ object EncryptionManager {
         cipherInstance.init(cipherMode, KeyStoreManager.getKey(), cipherParameter)
 
         // Writing to OutputStream
-        if(mode = KeyMode.PASSWORD){
-            PasswordKeyManager()
+        when (mode){ KeyMode.PASSWORD ->{
+           val salt =  PasswordKeyManager.generateSalt()
+            outputStream.write(salt)
+            PasswordKeyManager.deriveKeyFromPassword(password, salt)
         }
+            KeyMode.KEYSTORE ->{
+                KeyStoreManager.getKey()
+            }
+        }
+        outputStream.write(cipherInstance.iv)
+
+        // Reading input
+        val inputChunks = inputStream.buffered(8)
+
+        cipherInstance.update()
 
     }
 }

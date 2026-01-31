@@ -1,10 +1,5 @@
 package com.example.mkssecureshare
 
-import com.example.mkssecureshare.EncryptionManager.ITERATIONS
-import com.example.mkssecureshare.EncryptionManager.KEY_SIZE
-import com.example.mkssecureshare.EncryptionManager.MEMORY
-import com.example.mkssecureshare.EncryptionManager.PARALLELISM
-import com.example.mkssecureshare.EncryptionManager.TYPE
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.security.SecureRandom
@@ -13,9 +8,12 @@ import javax.crypto.spec.SecretKeySpec
 
 class PasswordKeyManager {
 
+companion object{
+    /**
+     * Generate a salt for passwords.
+     * Returns a SecureRandom salt.
+     * */
 
-
-    // Generate a salt for passwords
     fun generateSalt(): ByteArray {
         val salt = ByteArray(16)
         val secureRandom = SecureRandom()
@@ -23,7 +21,8 @@ class PasswordKeyManager {
         return salt
     }
 
-    // Derive the Key from User provided password
+   /**Derive the Key from User provided password*/
+
     fun deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey {
         val argonByteArray = ByteArray(KEY_SIZE/8)
 
@@ -45,4 +44,6 @@ class PasswordKeyManager {
             argonByteArray.fill(0)
         }
     }
+}
+
 }

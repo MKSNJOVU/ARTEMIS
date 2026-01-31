@@ -1,6 +1,8 @@
 package com.example.mkssecureshare
 
-enum class KeyMode {
+enum class KeyMode() {
     KEYSTORE,
     PASSWORD
+
+
 }
