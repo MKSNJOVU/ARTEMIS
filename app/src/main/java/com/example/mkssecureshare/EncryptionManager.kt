@@ -4,11 +4,13 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.security.keystore.StrongBoxUnavailableException
+import android.util.Log
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.KeyStore
+import java.security.ProviderException
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -39,6 +41,8 @@ object EncryptionManager {
     // Cipher Config
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
 
+    // Exception TAG
+    private  const val TAG = "EncryptionManager"
 
     // Helper function for devices with or without StrongBox
     private fun generateNewKey(useStrongBox: Boolean): SecretKey {
@@ -72,8 +76,8 @@ object EncryptionManager {
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
             try {
                 return generateNewKey( true)
-            } catch (e: StrongBoxUnavailableException){
-                // StrongBox not available, use regular KeyStore
+            } catch (e: ProviderException){
+               Log.d(TAG,"StrongBox not available, using KeyStore: ${e.message}")
             }
         }
             return generateNewKey(false)
@@ -90,7 +94,9 @@ object EncryptionManager {
 
     // Derive the Key from User provided password
     fun deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey {
-        val builder = Argon2Parameters.Builder(TYPE)
+        val argonByteArray = ByteArray(KEY_SIZE/8)
+
+        try{val builder = Argon2Parameters.Builder(TYPE)
             .withIterations(ITERATIONS)
             .withMemoryAsKB(MEMORY)
             .withParallelism(PARALLELISM)
@@ -99,11 +105,14 @@ object EncryptionManager {
         val argon = Argon2BytesGenerator()
         argon.init(argonParameters) // initialize Argon2 from Parameters
 
-        val argonByteArray = ByteArray(KEY_SIZE/8)
         argon.generateBytes(password,argonByteArray)
         val secretKey = SecretKeySpec(argonByteArray, "AES")
 
-        return secretKey
+        return secretKey}
+        finally {
+            password.fill('\u0000')
+            argonByteArray.fill(0)
+        }
     }
 
     fun encrypt(inputStream: InputStream, outputStream: OutputStream, byteArray: ByteArray) {
