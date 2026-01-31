@@ -3,7 +3,6 @@ package com.example.mkssecureshare
 import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
 import android.util.Log
 import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
@@ -25,7 +24,7 @@ object EncryptionManager {
     const val BLOCKMODE = KeyProperties.BLOCK_MODE_GCM
     const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
     const val ALIAS = "secret_key"
-    const val  PROVIDER = "AndroidKeyStore"
+    const val PROVIDER = "AndroidKeyStore"
 
     // AES-GCM Config
     const val KEY_SIZE = 256
