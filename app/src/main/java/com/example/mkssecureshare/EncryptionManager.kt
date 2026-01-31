@@ -54,7 +54,7 @@ object EncryptionManager {
         val inputChunks = ByteArray(8192)
         var readInputStreamBytes = inputStream.read(inputChunks)
 
-        while(readInputStreamBytes > -1){
+        while(readInputStreamBytes > - 1){
             val encryptedChunk = cipher.update(inputChunks,0,readInputStreamBytes)
             outputStream.write(encryptedChunk)
             readInputStreamBytes = inputStream.read(inputChunks)
