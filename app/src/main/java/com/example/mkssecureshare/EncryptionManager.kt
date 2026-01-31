@@ -1,13 +1,12 @@
 package com.example.mkssecureshare
 
 import android.security.keystore.KeyProperties
-import org.bouncycastle.crypto.params.Argon2Parameters
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.SecureRandom
 import javax.crypto.Cipher
+import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
-import com.example.mkssecureshare.KeyStoreManager
 
 object EncryptionManager {
     // KeyStore config
@@ -22,7 +21,7 @@ object EncryptionManager {
     const val TAG = "EncryptionManager"
 
     fun encrypt(inputStream: InputStream, outputStream: OutputStream,
-                mode: KeyMode, byteArray: ByteArray,
+                mode: KeyMode,
                 password: CharArray) {
 
         // Creating a random IV
@@ -31,27 +30,35 @@ object EncryptionManager {
         secureRandom.nextBytes(iv)
 
         // Creating Cipher encrypt mode and AES GCM Parameters
-        val cipherInstance = Cipher.getInstance(TRANSFORMATION)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
         val cipherMode = Cipher.ENCRYPT_MODE
         val cipherParameter = GCMParameterSpec(TAG_SIZE, iv)
-        cipherInstance.init(cipherMode, KeyStoreManager.getKey(), cipherParameter)
 
         // Writing to OutputStream
-        when (mode){ KeyMode.PASSWORD ->{
+       val secretKey: SecretKey = when (mode){ KeyMode.PASSWORD ->{
            val salt =  PasswordKeyManager.generateSalt()
             outputStream.write(salt)
             PasswordKeyManager.deriveKeyFromPassword(password, salt)
+
         }
             KeyMode.KEYSTORE ->{
-                KeyStoreManager.getKey()
+               KeyStoreManager.getKey()
             }
         }
-        outputStream.write(cipherInstance.iv)
+
+        cipher.init(cipherMode, secretKey, cipherParameter)
+
+        outputStream.write(cipher.iv)
 
         // Reading input
-        val inputChunks = inputStream.buffered(8)
+        val inputChunks = ByteArray(8192)
+        var readInputStreamBytes = inputStream.read(inputChunks)
 
-        cipherInstance.update()
-
+        while(readInputStreamBytes > -1){
+            val encryptedChunk = cipher.update(inputChunks,0,readInputStreamBytes)
+            outputStream.write(encryptedChunk)
+            readInputStreamBytes = inputStream.read(inputChunks)
+        }
+       outputStream.write(cipher.doFinal())
     }
 }
