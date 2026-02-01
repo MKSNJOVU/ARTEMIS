@@ -8,6 +8,7 @@ const val PROVIDER = "AndroidKeyStore"
 
 // AES-GCM Config
 const val KEY_SIZE = 256
+const val SALT_SIZE = 16
 const val IV_SIZE = 12
 const val TAG_SIZE = 128
 

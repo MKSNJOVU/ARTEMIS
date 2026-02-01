@@ -1,9 +1,11 @@
 package com.example.mkssecureshare
 
 import android.security.keystore.KeyProperties
+import android.util.Log
 import java.io.InputStream
 import java.io.OutputStream
 import java.security.SecureRandom
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -64,18 +66,42 @@ object EncryptionManager {
 
     fun decrypt( inputStream: InputStream, outputStream: OutputStream,
                  mode: KeyMode, password: CharArray){
+
+        // Initialize Cipher in DecryptMode
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val cipherMode = Cipher.DECRYPT_MODE
+        val decryptionSalt = ByteArray(SALT_SIZE)
+        val decryptionIV = ByteArray(IV_SIZE)
         // Reading InputStream
         val secretKey: SecretKey = when (mode){ KeyMode.PASSWORD ->{
-            val salt =  PasswordKeyManager.generateSalt()
-            inputStream.read(salt)
-            PasswordKeyManager.deriveKeyFromPassword(password, salt)
-
+            inputStream.read(decryptionSalt)
+            inputStream.read(decryptionIV)
+            PasswordKeyManager.deriveKeyFromPassword(password, decryptionSalt)
         }
             KeyMode.KEYSTORE ->{
+                inputStream.read(decryptionIV)
                 KeyStoreManager.getKey()
             }
         }
+        val cipherParameter = GCMParameterSpec(TAG_SIZE, decryptionIV)
 
-        inputStream.read()
+        cipher.init(cipherMode,secretKey,cipherParameter)
+
+        // Reading output chunks
+        val outputChunks = ByteArray(8192)
+        var readOutputStreamBytes = inputStream.read(outputChunks)
+
+        while(readOutputStreamBytes > - 1){
+            val decryptedChunk = cipher.update(outputChunks,0,readOutputStreamBytes)
+            outputStream.write(decryptedChunk)
+            readOutputStreamBytes = inputStream.read(outputChunks)
+        }
+        try {
+            outputStream.write(cipher.doFinal())
+        }
+        catch (e: AEADBadTagException){
+            Log.d(TAG,"Invalid Authentication Tag: ${e.message}")
+        }
+
     }
 }

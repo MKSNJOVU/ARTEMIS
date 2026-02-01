@@ -15,7 +15,7 @@ companion object{
      * */
 
     fun generateSalt(): ByteArray {
-        val salt = ByteArray(16)
+        val salt = ByteArray(SALT_SIZE)
         val secureRandom = SecureRandom()
         secureRandom.nextBytes(salt)
         return salt
