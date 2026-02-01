@@ -11,7 +11,7 @@ class PasswordKeyManager {
 companion object{
     /**
      * Generate a salt for passwords.
-     * Returns a SecureRandom salt.
+     * Returns a new random salt as a ByteArray.
      * */
 
     fun generateSalt(): ByteArray {
