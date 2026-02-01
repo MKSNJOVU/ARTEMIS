@@ -164,8 +164,9 @@ object EncryptionManager {
            tempFileStream?.close()
            tempFileStream = null
 
-           FileInputStream(tempFile).use {
-                   fis -> fis.copyTo(outputStream)
+           val file = requireNotNull(tempFile) { "Temporary file is null when reading decrypted output" }
+           FileInputStream(file).use { fis ->
+               fis.copyTo(outputStream)
            }
        } else{
            if (finalChunk != null && finalChunk.isNotEmpty()){
