@@ -18,3 +18,6 @@ const val ITERATIONS = 3
 const val MEMORY = 65536 // ~64 MB
 const val PARALLELISM = 1
 const val TYPE = Argon2Parameters.ARGON2_id
+
+// Hybrid Buffering Memory Threshold
+const val MEMORY_THRESHOLD = 10 * 1024 * 1024

@@ -26,7 +26,8 @@ companion object{
     fun deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey {
         val argonByteArray = ByteArray(KEY_SIZE/8)
 
-        try{val builder = Argon2Parameters.Builder(TYPE)
+        try{
+            val builder = Argon2Parameters.Builder(TYPE)
             .withIterations(ITERATIONS)
             .withMemoryAsKB(MEMORY)
             .withParallelism(PARALLELISM)
