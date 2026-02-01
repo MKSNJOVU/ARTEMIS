@@ -61,4 +61,21 @@ object EncryptionManager {
         }
        outputStream.write(cipher.doFinal())
     }
+
+    fun decrypt( inputStream: InputStream, outputStream: OutputStream,
+                 mode: KeyMode, password: CharArray){
+        // Reading InputStream
+        val secretKey: SecretKey = when (mode){ KeyMode.PASSWORD ->{
+            val salt =  PasswordKeyManager.generateSalt()
+            inputStream.read(salt)
+            PasswordKeyManager.deriveKeyFromPassword(password, salt)
+
+        }
+            KeyMode.KEYSTORE ->{
+                KeyStoreManager.getKey()
+            }
+        }
+
+        inputStream.read()
+    }
 }
