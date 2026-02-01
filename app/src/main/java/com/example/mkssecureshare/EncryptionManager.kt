@@ -1,133 +1,190 @@
 package com.example.mkssecureshare
 
-import android.os.Build
-import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Log
-import org.bouncycastle.crypto.generators.Argon2BytesGenerator
-import org.bouncycastle.crypto.params.Argon2Parameters
+import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
-import java.security.KeyStore
-import java.security.ProviderException
 import java.security.SecureRandom
+import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 object EncryptionManager {
     // KeyStore config
-
     const val ALGORITHM = KeyProperties.KEY_ALGORITHM_AES
     const val BLOCKMODE = KeyProperties.BLOCK_MODE_GCM
     const val PADDING = KeyProperties.ENCRYPTION_PADDING_NONE
-    const val ALIAS = "secret_key"
-    const val PROVIDER = "AndroidKeyStore"
 
-    // AES-GCM Config
-    const val KEY_SIZE = 256
-    const val IV_SIZE = 12
-    const val TAG_SIZE = 128
-
-
-    // Argon2 Config
-    const val ITERATIONS = 3
-    const val MEMORY = 65536 // ~64 MB
-    const val PARALLELISM = 1
-    const val TYPE = Argon2Parameters.ARGON2_id
     // Cipher Config
     private const val TRANSFORMATION = "AES/GCM/NoPadding"
 
     // Exception TAG
-    private  const val TAG = "EncryptionManager"
+    const val TAG = "EncryptionManager"
 
-    // Helper function for devices with or without StrongBox
-    private fun generateNewKey(useStrongBox: Boolean): SecretKey {
-        val keyGenerator = KeyGenerator.getInstance(ALGORITHM,
-            PROVIDER
-        )
+    fun encrypt(inputStream: InputStream, outputStream: OutputStream,
+                mode: KeyMode,
+                password: CharArray? = null) {
 
-        val builder = KeyGenParameterSpec.Builder(
-            ALIAS,
-            KeyProperties.PURPOSE_DECRYPT or
-                    KeyProperties.PURPOSE_ENCRYPT
-        )
-            .setBlockModes(BLOCKMODE)
-            .setEncryptionPaddings(PADDING)
-            .setKeySize(KEY_SIZE)
-            if (useStrongBox && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
-                builder.setIsStrongBoxBacked(true)
-            }
-            keyGenerator.init(builder.build())
-            return keyGenerator.generateKey()
-
-    }
-    // Get the Key
-    fun getKey(): SecretKey {
-        val keyStore = KeyStore.getInstance(PROVIDER)
-        keyStore.load(null)
-
-        if (keyStore.containsAlias(ALIAS))
-            return keyStore.getKey(ALIAS, null) as SecretKey
-
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.P){
-            try {
-                return generateNewKey( true)
-            } catch (e: ProviderException){
-               Log.d(TAG,"StrongBox not available, using KeyStore: ${e.message}")
-            }
-        }
-            return generateNewKey(false)
-
-    }
-
-    // Generate a salt for passwords
-    fun generateSalt(): ByteArray {
-        val salt = ByteArray(16)
-        val secureRandom = SecureRandom()
-        secureRandom.nextBytes(salt)
-        return salt
-    }
-
-    // Derive the Key from User provided password
-    fun deriveKeyFromPassword(password: CharArray, salt: ByteArray): SecretKey {
-        val argonByteArray = ByteArray(KEY_SIZE/8)
-
-        try{val builder = Argon2Parameters.Builder(TYPE)
-            .withIterations(ITERATIONS)
-            .withMemoryAsKB(MEMORY)
-            .withParallelism(PARALLELISM)
-            .withSalt(salt)
-        val argonParameters = builder.build() // build Argon from parameters
-        val argon = Argon2BytesGenerator()
-        argon.init(argonParameters) // initialize Argon2 from Parameters
-
-        argon.generateBytes(password,argonByteArray)
-        val secretKey = SecretKeySpec(argonByteArray, "AES")
-
-        return secretKey}
-        finally {
-            password.fill('\u0000')
-            argonByteArray.fill(0)
-        }
-    }
-
-    fun encrypt(inputStream: InputStream, outputStream: OutputStream, byteArray: ByteArray) {
         // Creating a random IV
         val secureRandom = SecureRandom()
         val iv = ByteArray(IV_SIZE)
         secureRandom.nextBytes(iv)
 
         // Creating Cipher encrypt mode and AES GCM Parameters
-        val cipherInstance = Cipher.getInstance(TRANSFORMATION)
+        val cipher = Cipher.getInstance(TRANSFORMATION)
         val cipherMode = Cipher.ENCRYPT_MODE
         val cipherParameter = GCMParameterSpec(TAG_SIZE, iv)
-        cipherInstance.init(cipherMode, getKey(), cipherParameter)
 
         // Writing to OutputStream
+       val secretKey: SecretKey = when (mode){ KeyMode.PASSWORD ->{
 
+               if (password == null){
+                   throw IllegalArgumentException("Password required!")
+               }else{
 
+                   val salt = PasswordKeyManager.generateSalt()
+                   outputStream.write(salt)
+                   PasswordKeyManager.deriveKeyFromPassword(password, salt)
+               }
+       }
+            KeyMode.KEYSTORE ->{
+               KeyStoreManager.getKey()
+            }
+        }
+
+        cipher.init(cipherMode, secretKey, cipherParameter)
+
+        outputStream.write(cipher.iv)
+
+        // Reading input
+        val inputChunks = ByteArray(8192)
+        var readInputStreamBytes = inputStream.read(inputChunks)
+
+        while(readInputStreamBytes > - 1){
+            val encryptedChunk = cipher.update(inputChunks,0,readInputStreamBytes)
+            if (encryptedChunk != null && encryptedChunk.isNotEmpty()){
+                outputStream.write(encryptedChunk)
+            }
+
+            readInputStreamBytes = inputStream.read(inputChunks)
+        }
+       outputStream.write(cipher.doFinal())
     }
+    fun readExactly(inputStream: InputStream, buffer: ByteArray): Boolean{
+        var offset = 0
+        while (offset < buffer.size){
+            val bytesRead = inputStream.read(buffer, offset, buffer.size - offset)
+            if (bytesRead == -1)
+                return false
+            offset += bytesRead
+        }
+        return true
+    }
+
+    fun decrypt( inputStream: InputStream, outputStream: OutputStream,
+                 mode: KeyMode, password: CharArray?, tempDir: File): DecryptionResults {
+
+        // Initialize Cipher in DecryptMode
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        val cipherMode = Cipher.DECRYPT_MODE
+        val decryptionSalt = ByteArray(SALT_SIZE)
+        val decryptionIV = ByteArray(IV_SIZE)
+        // Reading InputStream
+        val secretKey: SecretKey = when (mode){ KeyMode.PASSWORD ->{
+            if (password == null){
+               return DecryptionResults.FailedDecryption("Password was not provided!")
+            }
+            if (!readExactly(inputStream, decryptionSalt)){
+                return DecryptionResults.FailedDecryption("Unexpected EOF reading Salt.")
+            }
+            if (!readExactly(inputStream, decryptionIV)){
+                return DecryptionResults.FailedDecryption("Unexpected EOF reading IV.")
+            }
+            PasswordKeyManager.deriveKeyFromPassword(password, decryptionSalt)
+        }
+            KeyMode.KEYSTORE ->{
+                if (!readExactly(inputStream, decryptionIV)){
+                    return DecryptionResults.FailedDecryption("Unexpected EOF reading IV.")
+                }
+                KeyStoreManager.getKey()
+            }
+        }
+        val cipherParameter = GCMParameterSpec(TAG_SIZE, decryptionIV)
+
+        cipher.init(cipherMode,secretKey,cipherParameter)
+
+        // Hybrid buffering setup
+        var memoryBuffer: ByteArrayOutputStream? = ByteArrayOutputStream()
+        var tempFile: File? = null
+        var tempFileStream: FileOutputStream? = null
+        var totalBytesWritten = 0L
+        var usingTempFile = false
+
+   try {
+       val outputChunks = ByteArray(8192)
+       var readOutputStreamBytes = inputStream.read(outputChunks)
+       while(readOutputStreamBytes > - 1){
+           val decryptedChunk = cipher.update(outputChunks,0,readOutputStreamBytes)
+           if (decryptedChunk != null && decryptedChunk.isNotEmpty()){
+               totalBytesWritten += decryptedChunk.size
+               // Switch to temp file if threshold exceeded
+               if (!usingTempFile && totalBytesWritten > MEMORY_THRESHOLD) {
+                   val file = File.createTempFile("decrypt_", ".tmp", tempDir)
+                   tempFile = file
+                   val stream = FileOutputStream(file)
+                   tempFileStream = stream
+                   memoryBuffer?.writeTo(stream)
+                   memoryBuffer?.close()
+                   memoryBuffer = null
+                   usingTempFile = true
+               }
+
+               if (usingTempFile){
+                   tempFileStream?.write(decryptedChunk)
+               }else{
+                   memoryBuffer?.write(decryptedChunk)
+               }
+           }
+           readOutputStreamBytes = inputStream.read(outputChunks)
+       }
+
+       // Verify auth tag
+       val finalChunk = cipher.doFinal()
+
+       // Auth verified - write to real output
+       if (usingTempFile){
+           if (finalChunk != null && finalChunk.isNotEmpty()){
+               tempFileStream?.write(finalChunk)
+           }
+           tempFileStream?.close()
+           tempFileStream = null
+
+           val file = requireNotNull(tempFile) { "Temporary file is null when reading decrypted output" }
+           FileInputStream(file).use { fis ->
+               fis.copyTo(outputStream)
+           }
+       } else{
+           if (finalChunk != null && finalChunk.isNotEmpty()){
+               memoryBuffer?.write(finalChunk)
+           }
+           memoryBuffer?.writeTo(outputStream)
+       }
+       return DecryptionResults.SuccessfulDecryption
+
+
+   }catch (e: AEADBadTagException){
+       Log.d(TAG,"Invalid Authentication Tag: ${e.message}")
+       return DecryptionResults.FailedDecryption("Authentication failed. File may be corrupted or tampered with.")
+   } finally{
+       memoryBuffer?.close()
+       tempFileStream?.close()
+       tempFile?.delete()
+   }
+
+   }
 }
