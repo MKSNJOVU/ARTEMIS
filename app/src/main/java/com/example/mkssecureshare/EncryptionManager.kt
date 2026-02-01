@@ -8,13 +8,11 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
-import java.nio.Buffer
 import java.security.SecureRandom
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
-import kotlin.Result.Companion.failure
 
 object EncryptionManager {
     // KeyStore config
@@ -136,9 +134,11 @@ object EncryptionManager {
                totalBytesWritten += decryptedChunk.size
                // Switch to temp file if threshold exceeded
                if (!usingTempFile && totalBytesWritten > MEMORY_THRESHOLD) {
-                   tempFile = File.createTempFile("decrypt_", ".tmp", tempDir)
-                   tempFileStream = FileOutputStream(tempFile)
-                   memoryBuffer?.writeTo(tempFileStream)
+                   val file = File.createTempFile("decrypt_", ".tmp", tempDir)
+                   tempFile = file
+                   val stream = FileOutputStream(file)
+                   tempFileStream = stream
+                   memoryBuffer?.writeTo(stream)
                    memoryBuffer?.close()
                    memoryBuffer = null
                    usingTempFile = true

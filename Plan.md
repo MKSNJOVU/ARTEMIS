@@ -286,3 +286,101 @@ Each coding session:
 - Biometric key derivation
 - Retention policies (auto-purge: 24h, 3mo, 2yr)
 - Progress indicator for large files
+
+---
+
+## Amendments
+
+### Phase 1 Amendments
+
+#### File Structure
+
+Separated concerns into multiple files:
+
+```
+com/example/mkssecureshare/
+├── CryptoConstants.kt      # Top-level constants (KEY_SIZE, IV_SIZE, SALT_SIZE, etc.)
+├── KeyMode.kt              # Enum: KEYSTORE, PASSWORD
+├── KeyStoreManager.kt      # Hardware-backed key management with StrongBox fallback
+├── PasswordKeyManager.kt   # Argon2id key derivation with sensitive data clearing
+├── DecryptionResults.kt    # Sealed class for decrypt success/failure handling
+├── EncryptionManager.kt    # Core encrypt/decrypt functions
+└── MainActivity.kt         # UI entry point (Phase 2)
+```
+
+#### File Format Update
+
+**PASSWORD mode** prepends salt before IV:
+```
+[Salt: 16 bytes][IV: 12 bytes][Ciphertext][Auth Tag: 16 bytes]
+```
+
+#### 1.2 KeyStore Key Management - Amendments
+
+- Added `ProviderException` catch for StrongBox fallback (API 24 compatibility)
+- Separated into `KeyStoreManager.kt` with companion object
+- `generateNewKey(useStrongBox: Boolean)` helper function
+
+#### 1.3 Password Key Derivation - Amendments
+
+- Separated into `PasswordKeyManager.kt`
+- **Security**: Sensitive data clearing in `finally` block
+  - `password.fill('\u0000')` - zeros the CharArray
+  - `argonByteArray.fill(0)` - zeros the derived key bytes
+
+#### 1.4 Encrypt Function - Amendments
+
+- Password parameter made nullable: `password: CharArray? = null`
+- Added validation: throws `IllegalArgumentException` if PASSWORD mode without password
+- Added null-check for `encryptedChunk` before writing
+
+#### 1.5 Decrypt Function - Amendments
+
+**Signature change:**
+```kotlin
+fun decrypt(
+    inputStream: InputStream,
+    outputStream: OutputStream,
+    mode: KeyMode,
+    password: CharArray?,
+    tempDir: File
+): DecryptionResults
+```
+
+**New helper function - `readExactly()`:**
+- Reads exact byte count into buffer
+- Handles partial reads (InputStream.read() not guaranteed to fill buffer)
+- Returns `false` on early EOF
+
+**Hybrid buffering (security enhancement):**
+- Problem: GCM auth tag only verified at `doFinal()`, but plaintext written during loop
+- Solution: Buffer decrypted output, only write to real output after auth verification
+- Memory buffer for files < 10MB (`MEMORY_THRESHOLD`)
+- Temp file for files >= 10MB
+- Temp file cleanup in `finally` block
+
+**Result type:**
+- Returns `DecryptionResults` sealed class instead of `Unit`
+- `SuccessfulDecryption` object for success
+- `FailedDecryption(reason: String)` data class for failures
+
+#### New Types Added
+
+**KeyMode.kt:**
+```kotlin
+enum class KeyMode {
+    KEYSTORE,
+    PASSWORD
+}
+```
+
+**DecryptionResults.kt:**
+```kotlin
+sealed class DecryptionResults {
+    object SuccessfulDecryption : DecryptionResults()
+    data class FailedDecryption(val reason: String) : DecryptionResults()
+}
+```
+
+**CryptoConstants.kt:**
+- `MEMORY_THRESHOLD = 10 * 1024 * 1024` (10MB for hybrid buffering)
