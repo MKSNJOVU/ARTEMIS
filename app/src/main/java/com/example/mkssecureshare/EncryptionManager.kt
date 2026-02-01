@@ -65,7 +65,7 @@ object EncryptionManager {
     }
 
     fun decrypt( inputStream: InputStream, outputStream: OutputStream,
-                 mode: KeyMode, password: CharArray){
+                 mode: KeyMode, password: CharArray): DecryptionResults {
 
         // Initialize Cipher in DecryptMode
         val cipher = Cipher.getInstance(TRANSFORMATION)
@@ -101,7 +101,8 @@ object EncryptionManager {
         }
         catch (e: AEADBadTagException){
             Log.d(TAG,"Invalid Authentication Tag: ${e.message}")
+             return DecryptionResults.FailedDecryption("An Invalid Authentication was used. Decryption Failed.")
         }
-
+        return DecryptionResults.SuccessfulDecryption
     }
 }
