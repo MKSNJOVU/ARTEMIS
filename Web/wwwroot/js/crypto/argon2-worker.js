@@ -4,7 +4,7 @@
  */
 
 // Import argon2-browser
-importScripts("/js/liblargon2-browser.min.js");
+importScripts("/js/lib/argon2-browser.min.js");
 
 self.onmessage = async function (event) {
   const { password, salt, config } = event.data;

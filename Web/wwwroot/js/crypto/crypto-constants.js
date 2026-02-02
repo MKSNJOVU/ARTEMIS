@@ -16,7 +16,7 @@ export const CryptoConstants = Object.freeze({
   KEY_SIZE: 32,
 
   SALT_SIZE: 16, // bytes
-  IV_SIZE: 12,   // bytes
+  IV_SIZE: 12, // bytes
 
   // GCM tag length: 128 bits = 16 bytes. Web Crypto expects bits.
   TAG_SIZE_BITS: 128,
