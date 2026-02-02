@@ -11,7 +11,7 @@ self.onmessage = async function (event) {
 
   try {
     const result = await argon2.hash({
-      password: password,
+      pass: password,
       salt: salt,
       time: config.iterations,
       memory: config.memory,
