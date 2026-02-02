@@ -60,3 +60,51 @@ async function deriveKey(password, salt) {
     });
   });
 }
+
+export async function encrypt(plaintext, password, onProgress = null) {
+  // Generate a Random Salt
+  const salt = crypto.getRandomValues(
+    new Uint8Array(CryptoConstants.SALT_SIZE),
+  );
+
+  if (onProgress) onProgress(10, "Generating the salt...");
+
+  // Deriving the key
+  if (onProgress) onProgress(15, "Deriving key...");
+  const key = await deriveKey(password, salt);
+
+  // Generating the IV
+  const randomIV = crypto.getRandomValues(
+    new Uint8Array(CryptoConstants.IV_SIZE),
+  );
+
+  // Encrypting with AES-GCM
+  if (onProgress) onProgress(50, "Encrypting...");
+
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: CryptoConstants.ALGORITHM,
+      iv: randomIV,
+      tagLength: CryptoConstants.TAG_SIZE,
+    },
+    key,
+    plaintext,
+  );
+
+  if (onProgress) onProgress(90, "Providing output");
+
+  // Encryption result
+  const encryptedResult = new Uint8Array(
+    CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE + ciphertext.byteLength,
+  );
+  encryptedResult.set(salt, 0);
+  encryptedResult.set(randomIV, CryptoConstants.SALT_SIZE);
+  encryptedResult.set(
+    new Uint8Array(ciphertext),
+    CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
+  );
+
+  if (onProgress) onProgress(100, "Done!");
+
+  return encryptedResult.buffer;
+}
