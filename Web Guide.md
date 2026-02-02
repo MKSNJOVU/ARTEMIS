@@ -174,186 +174,168 @@ self.onmessage = async function(event) {
 
 **Path:** `wwwroot/js/crypto/crypto-core.js`
 
+This is the heart of your encryption system. You need to implement 3 functions that mirror your Kotlin `EncryptionManager`.
+
+**Documentation to study:**
+- Web Crypto API: https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto
+- `crypto.subtle.encrypt()`: https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt
+- `crypto.subtle.decrypt()`: https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/decrypt
+- `crypto.subtle.importKey()`: https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/importKey
+- `crypto.getRandomValues()`: https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
+- Web Workers communication: https://developer.mozilla.org/en-US/docs/Web/API/Worker/postMessage
+
+---
+
+### Setup: Module imports and worker management
+
+**Concepts to implement:**
+1. Import your `CryptoConstants` from the constants file
+2. Create a module-level variable to hold the worker instance (starts as `null`)
+3. Create a helper function `getArgon2Worker()` that:
+   - Returns existing worker if already created
+   - Creates new `Worker('/js/crypto/argon2-worker.js')` if not
+   - This is the "lazy singleton" pattern
+
+**Research:** How does JavaScript `import` work with ES modules?
+
+---
+
+### Function 1: `deriveKey(password, salt)`
+
+**Purpose:** Send password + salt to the Web Worker, get back derived key bytes, convert to CryptoKey
+
+**This function must:**
+1. Return a Promise (the worker communication is async)
+2. Get the worker using your helper function
+3. Set up `worker.onmessage` handler to receive the result
+4. Set up `worker.onerror` handler for failures
+5. Send data to worker with `worker.postMessage()`
+6. When worker responds successfully, use `crypto.subtle.importKey()` to convert raw bytes to a CryptoKey
+
+**Key concept - `crypto.subtle.importKey()`:**
 ```javascript
-/**
- * Core encryption/decryption module
- * Uses Web Crypto API for AES-256-GCM
- * Uses Web Worker for Argon2id key derivation
- */
+// Converts raw key bytes into a CryptoKey object
+crypto.subtle.importKey(
+    'raw',                              // format: we have raw bytes
+    keyBytes,                           // the Uint8Array from Argon2
+    { name: 'AES-GCM' },               // algorithm
+    false,                              // extractable: false for security
+    ['encrypt', 'decrypt']              // what operations this key can do
+)
+```
 
-import { CryptoConstants } from './crypto-constants.js';
-
-// Create worker instance
-let argon2Worker = null;
-
-function getArgon2Worker() {
-    if (!argon2Worker) {
-        argon2Worker = new Worker('/js/crypto/argon2-worker.js');
-    }
-    return argon2Worker;
-}
-
-/**
- * Derive AES-256 key from password using Argon2id
- * @param {string} password - User's password
- * @param {Uint8Array} salt - 16-byte salt
- * @returns {Promise<CryptoKey>} - AES-GCM key for Web Crypto API
- */
-export async function deriveKey(password, salt) {
-    return new Promise((resolve, reject) => {
-        const worker = getArgon2Worker();
-
-        worker.onmessage = async (event) => {
-            if (event.data.success) {
-                // Import the raw key bytes into Web Crypto API
-                try {
-                    const cryptoKey = await crypto.subtle.importKey(
-                        'raw',
-                        event.data.hash,
-                        { name: CryptoConstants.ALGORITHM },
-                        false,  // not extractable
-                        CryptoConstants.KEY_USAGE
-                    );
-                    resolve(cryptoKey);
-                } catch (err) {
-                    reject(new Error('Failed to import key: ' + err.message));
-                }
-            } else {
-                reject(new Error('Argon2 failed: ' + event.data.error));
-            }
-        };
-
-        worker.onerror = (error) => {
-            reject(new Error('Worker error: ' + error.message));
-        };
-
-        // Send work to the worker
-        worker.postMessage({
-            password: password,
-            salt: salt,
-            config: {
-                iterations: CryptoConstants.ARGON2_ITERATIONS,
-                memory: CryptoConstants.ARGON2_MEMORY,
-                parallelism: CryptoConstants.ARGON2_PARALLELISM,
-                keyLength: CryptoConstants.KEY_SIZE_BYTES
-            }
-        });
-    });
-}
-
-/**
- * Encrypt data with AES-256-GCM
- * Output format: [Salt: 16][IV: 12][Ciphertext][AuthTag: 16]
- *
- * @param {ArrayBuffer} plaintext - Data to encrypt
- * @param {string} password - User's password
- * @param {Function} onProgress - Optional progress callback (0-100)
- * @returns {Promise<ArrayBuffer>} - Encrypted blob
- */
-export async function encrypt(plaintext, password, onProgress = null) {
-    // 1. Generate random salt (16 bytes)
-    const salt = crypto.getRandomValues(new Uint8Array(CryptoConstants.SALT_SIZE));
-
-    if (onProgress) onProgress(10, 'Generating salt...');
-
-    // 2. Derive key using Argon2id (this takes ~2-3 seconds)
-    if (onProgress) onProgress(15, 'Deriving key (this takes a moment)...');
-    const key = await deriveKey(password, salt);
-
-    if (onProgress) onProgress(50, 'Key derived, encrypting...');
-
-    // 3. Generate random IV (12 bytes)
-    const iv = crypto.getRandomValues(new Uint8Array(CryptoConstants.IV_SIZE));
-
-    // 4. Encrypt using AES-256-GCM
-    const ciphertext = await crypto.subtle.encrypt(
-        {
-            name: CryptoConstants.ALGORITHM,
-            iv: iv,
-            tagLength: CryptoConstants.TAG_SIZE_BITS
-        },
-        key,
-        plaintext
-    );
-
-    if (onProgress) onProgress(90, 'Assembling output...');
-
-    // 5. Assemble output: salt + iv + ciphertext (which includes auth tag)
-    const result = new Uint8Array(
-        CryptoConstants.SALT_SIZE +
-        CryptoConstants.IV_SIZE +
-        ciphertext.byteLength
-    );
-
-    result.set(salt, 0);
-    result.set(iv, CryptoConstants.SALT_SIZE);
-    result.set(new Uint8Array(ciphertext), CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE);
-
-    if (onProgress) onProgress(100, 'Done!');
-
-    return result.buffer;
-}
-
-/**
- * Decrypt data with AES-256-GCM
- * Input format: [Salt: 16][IV: 12][Ciphertext][AuthTag: 16]
- *
- * @param {ArrayBuffer} encrypted - Encrypted blob
- * @param {string} password - User's password
- * @param {Function} onProgress - Optional progress callback (0-100)
- * @returns {Promise<ArrayBuffer>} - Decrypted plaintext
- * @throws {Error} - If authentication fails (wrong password or tampered data)
- */
-export async function decrypt(encrypted, password, onProgress = null) {
-    const data = new Uint8Array(encrypted);
-
-    // Minimum size: salt(16) + iv(12) + tag(16) = 44 bytes
-    if (data.length < 44) {
-        throw new Error('Invalid encrypted data: too short');
-    }
-
-    // 1. Extract salt (first 16 bytes)
-    const salt = data.slice(0, CryptoConstants.SALT_SIZE);
-
-    if (onProgress) onProgress(10, 'Extracted salt...');
-
-    // 2. Extract IV (next 12 bytes)
-    const iv = data.slice(
-        CryptoConstants.SALT_SIZE,
-        CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE
-    );
-
-    // 3. Extract ciphertext + auth tag (remainder)
-    const ciphertext = data.slice(CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE);
-
-    if (onProgress) onProgress(15, 'Deriving key (this takes a moment)...');
-
-    // 4. Derive key using Argon2id with extracted salt
-    const key = await deriveKey(password, salt);
-
-    if (onProgress) onProgress(50, 'Key derived, decrypting...');
-
-    // 5. Decrypt using AES-256-GCM
-    try {
-        const plaintext = await crypto.subtle.decrypt(
-            {
-                name: CryptoConstants.ALGORITHM,
-                iv: iv,
-                tagLength: CryptoConstants.TAG_SIZE_BITS
-            },
-            key,
-            ciphertext
-        );
-
-        if (onProgress) onProgress(100, 'Done!');
-
-        return plaintext;
-    } catch (error) {
-        // Web Crypto throws generic error on auth failure
-        throw new Error('Decryption failed. Wrong password or corrupted file.');
+**Data to send to worker:**
+```javascript
+{
+    password: password,
+    salt: salt,
+    config: {
+        iterations: /* from constants */,
+        memory: /* from constants */,
+        parallelism: /* from constants */,
+        keyLength: /* from constants - KEY_SIZE_BYTES */
     }
 }
 ```
+
+---
+
+### Function 2: `encrypt(plaintext, password, onProgress)`
+
+**Purpose:** Encrypt an ArrayBuffer and return format: `[Salt][IV][Ciphertext+AuthTag]`
+
+**Compare to your Kotlin `EncryptionManager.encrypt()`** - the logic is nearly identical:
+
+**Steps to implement:**
+1. Generate random salt (16 bytes) using `crypto.getRandomValues(new Uint8Array(...))`
+2. Call `deriveKey()` with password and salt (use `await`)
+3. Generate random IV (12 bytes) using `crypto.getRandomValues()`
+4. Call `crypto.subtle.encrypt()` with AES-GCM parameters
+5. Assemble the output by concatenating salt + iv + ciphertext
+
+**Key concept - `crypto.subtle.encrypt()`:**
+```javascript
+const ciphertext = await crypto.subtle.encrypt(
+    {
+        name: 'AES-GCM',
+        iv: iv,                         // your 12-byte IV
+        tagLength: 128                  // auth tag size in bits
+    },
+    key,                                // CryptoKey from deriveKey()
+    plaintext                           // ArrayBuffer to encrypt
+);
+// Note: ciphertext includes the auth tag automatically appended
+```
+
+**Key concept - Concatenating Uint8Arrays:**
+```javascript
+// Create result array of correct total size
+const result = new Uint8Array(totalSize);
+// Copy salt at position 0
+result.set(salt, 0);
+// Copy iv at position after salt
+result.set(iv, saltSize);
+// Copy ciphertext at position after salt+iv
+result.set(new Uint8Array(ciphertext), saltSize + ivSize);
+// Return as ArrayBuffer
+return result.buffer;
+```
+
+**Progress reporting:** If `onProgress` is provided, call it at key points:
+- `onProgress(10, 'Generating salt...')`
+- `onProgress(15, 'Deriving key...')`
+- `onProgress(50, 'Encrypting...')`
+- `onProgress(100, 'Done!')`
+
+---
+
+### Function 3: `decrypt(encrypted, password, onProgress)`
+
+**Purpose:** Decrypt data in format `[Salt][IV][Ciphertext+AuthTag]`
+
+**Compare to your Kotlin `EncryptionManager.decrypt()`**
+
+**Steps to implement:**
+1. Convert input to Uint8Array: `const data = new Uint8Array(encrypted)`
+2. Validate minimum size (salt + iv + tag = 44 bytes minimum)
+3. Extract salt: `data.slice(0, SALT_SIZE)`
+4. Extract IV: `data.slice(SALT_SIZE, SALT_SIZE + IV_SIZE)`
+5. Extract ciphertext: `data.slice(SALT_SIZE + IV_SIZE)`
+6. Derive key using extracted salt
+7. Call `crypto.subtle.decrypt()`
+8. Handle errors - wrong password throws an exception
+
+**Key concept - `crypto.subtle.decrypt()`:**
+```javascript
+try {
+    const plaintext = await crypto.subtle.decrypt(
+        {
+            name: 'AES-GCM',
+            iv: iv,
+            tagLength: 128
+        },
+        key,
+        ciphertext
+    );
+    return plaintext;
+} catch (error) {
+    // Auth tag verification failed = wrong password or tampered data
+    throw new Error('Decryption failed. Wrong password or corrupted file.');
+}
+```
+
+**Research:**
+- What does `Uint8Array.slice()` do?
+- What's the difference between `ArrayBuffer` and `Uint8Array`?
+
+---
+
+### Export your functions
+
+Remember to `export` the functions that other modules need:
+- `deriveKey` - needed by encrypt/decrypt
+- `encrypt` - needed by UI
+- `decrypt` - needed by UI
 
 ---
 
@@ -361,79 +343,86 @@ export async function decrypt(encrypted, password, onProgress = null) {
 
 **Path:** `wwwroot/js/crypto/file-handler.js`
 
+This module handles reading files from user input and triggering downloads. You need to implement 4 functions.
+
+### Function 1: `readFile(file, onProgress)`
+
+**Purpose:** Read a File object (from `<input type="file">`) into an ArrayBuffer
+
+**Concepts to research:**
+- `FileReader` API - how browsers read files: https://developer.mozilla.org/en-US/docs/Web/API/FileReader
+- `readAsArrayBuffer()` method - we need raw bytes, not text
+- `Promise` - wrap the async FileReader in a Promise so we can use `await`
+- FileReader events: `onload`, `onerror`, `onprogress`
+
+**Function signature:**
 ```javascript
-/**
- * File handling utilities for browser
- */
-
-/**
- * Read a File object into an ArrayBuffer
- * @param {File} file - File from input element
- * @param {Function} onProgress - Progress callback (0-100)
- * @returns {Promise<ArrayBuffer>}
- */
 export function readFile(file, onProgress = null) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('Failed to read file'));
-
-        if (onProgress) {
-            reader.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percent = Math.round((event.loaded / event.total) * 100);
-                    onProgress(percent, 'Reading file...');
-                }
-            };
-        }
-
-        reader.readAsArrayBuffer(file);
-    });
+    // Return a Promise that:
+    // 1. Creates a FileReader
+    // 2. Sets up onload to resolve with reader.result
+    // 3. Sets up onerror to reject with an Error
+    // 4. If onProgress provided, set up onprogress to report percentage
+    // 5. Calls reader.readAsArrayBuffer(file)
 }
+```
 
-/**
- * Trigger download of a blob
- * @param {ArrayBuffer} data - File data
- * @param {string} filename - Suggested filename
- * @param {string} mimeType - MIME type (default: application/octet-stream)
- */
+**Hint:** The Promise constructor pattern:
+```javascript
+return new Promise((resolve, reject) => {
+    // resolve(value) when successful
+    // reject(error) when failed
+});
+```
+
+---
+
+### Function 2: `downloadBlob(data, filename, mimeType)`
+
+**Purpose:** Trigger a file download in the browser from an ArrayBuffer
+
+**Concepts to research:**
+- `Blob` - binary data container: https://developer.mozilla.org/en-US/docs/Web/API/Blob
+- `URL.createObjectURL()` - creates a temporary URL for a Blob
+- `URL.revokeObjectURL()` - clean up when done (memory management)
+- Creating and clicking an `<a>` element programmatically
+- The `download` attribute on anchor elements
+
+**Function signature:**
+```javascript
 export function downloadBlob(data, filename, mimeType = 'application/octet-stream') {
-    const blob = new Blob([data], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    // Clean up
-    setTimeout(() => URL.revokeObjectURL(url), 100);
+    // 1. Create a Blob from the data with the given mimeType
+    // 2. Create an object URL for the blob
+    // 3. Create an <a> element with href=url and download=filename
+    // 4. Append to document, click it, remove it
+    // 5. Revoke the object URL to free memory (use setTimeout)
 }
+```
 
-/**
- * Get filename with .enc extension for encrypted files
- * @param {string} originalName - Original filename
- * @returns {string} - Filename with .enc extension
- */
-export function getEncryptedFilename(originalName) {
-    return originalName + '.enc';
-}
+---
 
-/**
- * Get original filename by removing .enc extension
- * @param {string} encryptedName - Encrypted filename
- * @returns {string} - Original filename
- */
-export function getDecryptedFilename(encryptedName) {
-    if (encryptedName.endsWith('.enc')) {
-        return encryptedName.slice(0, -4);
-    }
-    return 'decrypted_' + encryptedName;
-}
+### Function 3: `getEncryptedFilename(originalName)`
+
+**Purpose:** Add `.enc` extension to a filename
+
+**This one is simple:** Just concatenate `.enc` to the original name and return it.
+
+---
+
+### Function 4: `getDecryptedFilename(encryptedName)`
+
+**Purpose:** Remove `.enc` extension, or add `decrypted_` prefix if no `.enc`
+
+**Concepts to research:**
+- `String.endsWith()` - check if string ends with a suffix
+- `String.slice()` - extract part of a string (negative index removes from end)
+
+**Logic:**
+```
+if filename ends with ".enc":
+    return filename without the last 4 characters
+else:
+    return "decrypted_" + filename
 ```
 
 ---
@@ -444,19 +433,15 @@ export function getDecryptedFilename(encryptedName) {
 
 **Path:** `Controllers/EncryptController.cs`
 
-```csharp
-using Microsoft.AspNetCore.Mvc;
+**Research:** ASP.NET Core MVC Controllers
+- https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/actions
 
-namespace MKSSecureShare.Web.Controllers;
+**What to implement:**
+- A simple controller class that inherits from `Controller`
+- One action method `Index()` that returns `View()`
+- Namespace should match your project: `MKSSecureShare.Web.Controllers`
 
-public class EncryptController : Controller
-{
-    public IActionResult Index()
-    {
-        return View();
-    }
-}
-```
+**This is identical to your existing HomeController** - use it as a reference.
 
 ---
 
@@ -464,19 +449,7 @@ public class EncryptController : Controller
 
 **Path:** `Controllers/DecryptController.cs`
 
-```csharp
-using Microsoft.AspNetCore.Mvc;
-
-namespace MKSSecureShare.Web.Controllers;
-
-public class DecryptController : Controller
-{
-    public IActionResult Index()
-    {
-        return View();
-    }
-}
-```
+Same pattern as EncryptController - create a controller with an `Index()` action.
 
 ---
 
@@ -484,59 +457,37 @@ public class DecryptController : Controller
 
 **Path:** `Views/Encrypt/Index.cshtml`
 
+**Research:** Razor syntax and HTML forms
+- https://learn.microsoft.com/en-us/aspnet/core/mvc/views/razor
+
+**Elements you need to create:**
+
+1. **Page title** - Set `ViewData["Title"]` in a Razor code block
+
+2. **Security notice** - A paragraph explaining that encryption happens in the browser
+
+3. **Form with id="encrypt-form"** containing:
+   - File input (`<input type="file" id="file-input">`)
+   - A div with `id="file-info"` to show selected filename
+   - Password input (`<input type="password" id="password">`)
+   - Password confirmation input (`id="password-confirm"`)
+   - A div with `id="password-error"` for validation messages
+   - Progress bar container (hidden by default) with:
+     - `id="progress-container"`
+     - Inner div `id="progress-fill"` for the animated bar
+     - Text div `id="progress-text"` for status messages
+   - Submit button `id="encrypt-btn"`
+
+4. **Error container** - Hidden div `id="error-container"` with `id="error-message"` inside
+
+5. **Scripts section** - Load your encrypt-ui.js as a module:
 ```html
-@{
-    ViewData["Title"] = "Encrypt File";
-}
-
-<div class="crypto-container">
-    <h1>Encrypt a File</h1>
-    <p class="security-note">
-        All encryption happens in your browser. Your password never leaves this device.
-    </p>
-
-    <form id="encrypt-form" class="crypto-form">
-        <div class="form-group">
-            <label for="file-input">Select File</label>
-            <input type="file" id="file-input" required />
-            <div id="file-info" class="file-info"></div>
-        </div>
-
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" required minlength="1"
-                   autocomplete="new-password" />
-        </div>
-
-        <div class="form-group">
-            <label for="password-confirm">Confirm Password</label>
-            <input type="password" id="password-confirm" required />
-            <div id="password-error" class="error-text"></div>
-        </div>
-
-        <div id="progress-container" class="progress-container" hidden>
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill"></div>
-            </div>
-            <div id="progress-text" class="progress-text">Ready</div>
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" id="encrypt-btn" class="btn-primary">
-                Encrypt
-            </button>
-        </div>
-    </form>
-
-    <div id="error-container" class="error-container" hidden>
-        <p id="error-message"></p>
-    </div>
-</div>
-
 @section Scripts {
     <script type="module" src="~/js/ui/encrypt-ui.js"></script>
 }
 ```
+
+**Research:** What does `type="module"` do for script tags?
 
 ---
 
@@ -544,53 +495,12 @@ public class DecryptController : Controller
 
 **Path:** `Views/Decrypt/Index.cshtml`
 
-```html
-@{
-    ViewData["Title"] = "Decrypt File";
-}
+Similar to Encrypt view but simpler:
+- File input for `.enc` files (use `accept=".enc"` attribute)
+- Single password field (no confirmation needed)
+- Progress bar and error containers
 
-<div class="crypto-container">
-    <h1>Decrypt a File</h1>
-    <p class="security-note">
-        Decryption happens entirely in your browser. Your password is never sent anywhere.
-    </p>
-
-    <form id="decrypt-form" class="crypto-form">
-        <div class="form-group">
-            <label for="encrypted-file">Encrypted File (.enc)</label>
-            <input type="file" id="encrypted-file" accept=".enc" required />
-            <div id="file-info" class="file-info"></div>
-        </div>
-
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" required
-                   autocomplete="current-password" />
-        </div>
-
-        <div id="progress-container" class="progress-container" hidden>
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill"></div>
-            </div>
-            <div id="progress-text" class="progress-text">Ready</div>
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" id="decrypt-btn" class="btn-primary">
-                Decrypt
-            </button>
-        </div>
-    </form>
-
-    <div id="error-container" class="error-container" hidden>
-        <p id="error-message"></p>
-    </div>
-</div>
-
-@section Scripts {
-    <script type="module" src="~/js/ui/decrypt-ui.js"></script>
-}
-```
+**Research:** What does the `accept` attribute do on file inputs?
 
 ---
 
@@ -598,108 +508,55 @@ public class DecryptController : Controller
 
 **Path:** `wwwroot/js/ui/encrypt-ui.js`
 
-```javascript
-/**
- * Encrypt page UI handler
- */
+**Purpose:** Wire up the encrypt form to your crypto functions
 
+**Documentation to study:**
+- `document.getElementById()`: https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementById
+- `addEventListener()`: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+- Form `submit` event: https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/submit_event
+- `event.preventDefault()`: Stop form from submitting normally
+- File input `change` event and `e.target.files[0]`
+
+**Imports needed:**
+```javascript
 import { encrypt } from '../crypto/crypto-core.js';
 import { readFile, downloadBlob, getEncryptedFilename } from '../crypto/file-handler.js';
-
-const form = document.getElementById('encrypt-form');
-const fileInput = document.getElementById('file-input');
-const fileInfo = document.getElementById('file-info');
-const password = document.getElementById('password');
-const passwordConfirm = document.getElementById('password-confirm');
-const passwordError = document.getElementById('password-error');
-const progressContainer = document.getElementById('progress-container');
-const progressFill = document.getElementById('progress-fill');
-const progressText = document.getElementById('progress-text');
-const encryptBtn = document.getElementById('encrypt-btn');
-const errorContainer = document.getElementById('error-container');
-const errorMessage = document.getElementById('error-message');
-
-let selectedFile = null;
-
-// File selection handler
-fileInput.addEventListener('change', (e) => {
-    selectedFile = e.target.files[0];
-    if (selectedFile) {
-        const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-        fileInfo.textContent = `${selectedFile.name} (${sizeMB} MB)`;
-    } else {
-        fileInfo.textContent = '';
-    }
-});
-
-// Password confirmation validation
-passwordConfirm.addEventListener('input', () => {
-    if (password.value !== passwordConfirm.value) {
-        passwordError.textContent = 'Passwords do not match';
-    } else {
-        passwordError.textContent = '';
-    }
-});
-
-// Progress callback
-function updateProgress(percent, message) {
-    progressFill.style.width = percent + '%';
-    progressText.textContent = message;
-}
-
-// Show error
-function showError(message) {
-    errorContainer.hidden = false;
-    errorMessage.textContent = message;
-}
-
-// Hide error
-function hideError() {
-    errorContainer.hidden = true;
-}
-
-// Form submit handler
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    hideError();
-
-    // Validate passwords match
-    if (password.value !== passwordConfirm.value) {
-        showError('Passwords do not match');
-        return;
-    }
-
-    if (!selectedFile) {
-        showError('Please select a file');
-        return;
-    }
-
-    // Disable button, show progress
-    encryptBtn.disabled = true;
-    progressContainer.hidden = false;
-
-    try {
-        // Read file
-        updateProgress(5, 'Reading file...');
-        const plaintext = await readFile(selectedFile);
-
-        // Encrypt
-        const encrypted = await encrypt(plaintext, password.value, updateProgress);
-
-        // Trigger download
-        const encryptedFilename = getEncryptedFilename(selectedFile.name);
-        downloadBlob(encrypted, encryptedFilename);
-
-        updateProgress(100, 'Encryption complete! Download started.');
-
-    } catch (error) {
-        showError('Encryption failed: ' + error.message);
-        console.error(error);
-    } finally {
-        encryptBtn.disabled = false;
-    }
-});
 ```
+
+**Elements to get references to:**
+- form, fileInput, fileInfo, password, passwordConfirm, passwordError
+- progressContainer, progressFill, progressText
+- encryptBtn, errorContainer, errorMessage
+
+**Event handlers to implement:**
+
+1. **File input `change` handler:**
+   - Store selected file in a module-level variable
+   - Display filename and size in the file-info div
+   - Research: How to get file size in MB? (`file.size` is in bytes)
+
+2. **Password confirm `input` handler:**
+   - Compare password and passwordConfirm values
+   - Show/hide error text if they don't match
+
+3. **Form `submit` handler (async):**
+   - Call `e.preventDefault()` to stop normal form submission
+   - Validate: passwords match? file selected?
+   - Disable button, show progress container
+   - Use try/catch/finally:
+     - `try`: Read file → Encrypt → Download result
+     - `catch`: Show error message
+     - `finally`: Re-enable button
+
+**Helper functions to create:**
+- `updateProgress(percent, message)` - Update progress bar width and text
+- `showError(message)` - Show error container with message
+- `hideError()` - Hide error container
+
+**Research:**
+- How to set an element's `hidden` attribute?
+- How to set CSS width as a percentage via JavaScript?
+- How to disable a button via JavaScript?
 
 ---
 
@@ -707,96 +564,16 @@ form.addEventListener('submit', async (e) => {
 
 **Path:** `wwwroot/js/ui/decrypt-ui.js`
 
-```javascript
-/**
- * Decrypt page UI handler
- */
+**Similar to encrypt-ui.js but:**
+- Import `decrypt` instead of `encrypt`
+- Import `getDecryptedFilename` instead of `getEncryptedFilename`
+- No password confirmation field
+- Different validation (just check file and password exist)
 
-import { decrypt } from '../crypto/crypto-core.js';
-import { readFile, downloadBlob, getDecryptedFilename } from '../crypto/file-handler.js';
-
-const form = document.getElementById('decrypt-form');
-const fileInput = document.getElementById('encrypted-file');
-const fileInfo = document.getElementById('file-info');
-const password = document.getElementById('password');
-const progressContainer = document.getElementById('progress-container');
-const progressFill = document.getElementById('progress-fill');
-const progressText = document.getElementById('progress-text');
-const decryptBtn = document.getElementById('decrypt-btn');
-const errorContainer = document.getElementById('error-container');
-const errorMessage = document.getElementById('error-message');
-
-let selectedFile = null;
-
-// File selection handler
-fileInput.addEventListener('change', (e) => {
-    selectedFile = e.target.files[0];
-    if (selectedFile) {
-        const sizeMB = (selectedFile.size / (1024 * 1024)).toFixed(2);
-        fileInfo.textContent = `${selectedFile.name} (${sizeMB} MB)`;
-    } else {
-        fileInfo.textContent = '';
-    }
-});
-
-// Progress callback
-function updateProgress(percent, message) {
-    progressFill.style.width = percent + '%';
-    progressText.textContent = message;
-}
-
-// Show error
-function showError(message) {
-    errorContainer.hidden = false;
-    errorMessage.textContent = message;
-}
-
-// Hide error
-function hideError() {
-    errorContainer.hidden = true;
-}
-
-// Form submit handler
-form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    hideError();
-
-    if (!selectedFile) {
-        showError('Please select an encrypted file');
-        return;
-    }
-
-    if (!password.value) {
-        showError('Please enter the password');
-        return;
-    }
-
-    // Disable button, show progress
-    decryptBtn.disabled = true;
-    progressContainer.hidden = false;
-
-    try {
-        // Read encrypted file
-        updateProgress(5, 'Reading file...');
-        const encrypted = await readFile(selectedFile);
-
-        // Decrypt
-        const plaintext = await decrypt(encrypted, password.value, updateProgress);
-
-        // Trigger download
-        const decryptedFilename = getDecryptedFilename(selectedFile.name);
-        downloadBlob(plaintext, decryptedFilename);
-
-        updateProgress(100, 'Decryption complete! Download started.');
-
-    } catch (error) {
-        showError(error.message);
-        console.error(error);
-    } finally {
-        decryptBtn.disabled = false;
-    }
-});
-```
+**The submit handler flow:**
+1. Read encrypted file
+2. Decrypt with password
+3. Download decrypted result
 
 ---
 
@@ -804,17 +581,15 @@ form.addEventListener('submit', async (e) => {
 
 **Path:** `Views/Shared/_Layout.cshtml`
 
-Add navigation links:
+**What to add:** Navigation links to Encrypt and Decrypt pages
 
-```html
-<header nav ul section:
-<ul>
-    <li><a asp-area="" asp-controller="Home" asp-action="Index">Home</a></li>
-    <li><a asp-area="" asp-controller="Encrypt" asp-action="Index">Encrypt</a></li>
-    <li><a asp-area="" asp-controller="Decrypt" asp-action="Index">Decrypt</a></li>
-    <li><a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a></li>
-</ul>
-```
+**Research:** ASP.NET Core Tag Helpers for links
+- `asp-controller` attribute
+- `asp-action` attribute
+
+Add to your existing navigation:
+- Link to Encrypt controller, Index action
+- Link to Decrypt controller, Index action
 
 ---
 
@@ -822,117 +597,35 @@ Add navigation links:
 
 **Path:** `wwwroot/css/site.css`
 
-Add these styles:
+**CSS concepts to implement:**
 
-```css
-/* Crypto Form Styles */
-.crypto-container {
-    max-width: 600px;
-    margin: 2rem auto;
-    padding: 0 1rem;
-}
+1. **Container styling** (`.crypto-container`)
+   - Max width, centered with auto margins, padding
 
-.security-note {
-    background: #e8f5e9;
-    border-left: 4px solid #4caf50;
-    padding: 1rem;
-    margin-bottom: 2rem;
-    font-size: 0.9rem;
-}
+2. **Security note** (`.security-note`)
+   - Light green background, left border accent, padding
 
-.crypto-form {
-    background: #f5f5f5;
-    padding: 2rem;
-    border-radius: 8px;
-}
+3. **Form styling** (`.crypto-form`, `.form-group`)
+   - Background color, padding, border-radius
+   - Label styling (block display, margin, font-weight)
+   - Input styling (full width, padding, border, border-radius)
 
-.form-group {
-    margin-bottom: 1.5rem;
-}
+4. **Progress bar** (`.progress-container`, `.progress-bar`, `.progress-fill`)
+   - Fixed height bar with background
+   - Inner fill div that changes width (use CSS `transition` for animation)
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-}
+5. **Button styling** (`.btn-primary`)
+   - Background color, text color, padding, border-radius
+   - `:hover` state (darker background)
+   - `:disabled` state (lighter background, different cursor)
 
-.form-group input[type="file"],
-.form-group input[type="password"],
-.form-group input[type="text"] {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 1rem;
-}
+6. **Error styling** (`.error-container`, `.error-text`)
+   - Red/pink background for container
+   - Red text color
 
-.file-info {
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
-    color: #666;
-}
-
-.error-text {
-    color: #d32f2f;
-    font-size: 0.875rem;
-    margin-top: 0.25rem;
-}
-
-.progress-container {
-    margin: 1.5rem 0;
-}
-
-.progress-bar {
-    height: 8px;
-    background: #ddd;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.progress-fill {
-    height: 100%;
-    background: #2196f3;
-    width: 0%;
-    transition: width 0.3s ease;
-}
-
-.progress-text {
-    margin-top: 0.5rem;
-    font-size: 0.875rem;
-    color: #666;
-}
-
-.form-actions {
-    margin-top: 1.5rem;
-}
-
-.btn-primary {
-    background: #1976d2;
-    color: white;
-    border: none;
-    padding: 0.75rem 2rem;
-    font-size: 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.btn-primary:hover {
-    background: #1565c0;
-}
-
-.btn-primary:disabled {
-    background: #90caf9;
-    cursor: not-allowed;
-}
-
-.error-container {
-    background: #ffebee;
-    border-left: 4px solid #f44336;
-    padding: 1rem;
-    margin-top: 1rem;
-    color: #c62828;
-}
-```
+**Research:**
+- CSS `transition` property for smooth animations
+- CSS `:hover` and `:disabled` pseudo-classes
 
 ---
 
@@ -940,49 +633,35 @@ Add these styles:
 
 **Path:** `Program.cs`
 
-Add security headers:
+**Purpose:** Add security headers so the browser allows WASM and Web Workers
 
+**Research:**
+- Content Security Policy (CSP): https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
+- ASP.NET Core Middleware: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware
+
+**What to add:** Middleware that sets response headers
+
+**Headers needed:**
+1. `Content-Security-Policy` - Must allow:
+   - `'self'` for default sources
+   - `'wasm-unsafe-eval'` for script-src (Argon2 WASM)
+   - `'self' blob:` for worker-src (Web Workers)
+   - `'unsafe-inline'` for style-src (or use nonces)
+
+2. `X-Content-Type-Options: nosniff`
+3. `X-Frame-Options: DENY`
+4. `Referrer-Policy: strict-origin-when-cross-origin`
+
+**Middleware pattern:**
 ```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddControllersWithViews();
-
-var app = builder.Build();
-
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
-}
-
-// Security headers middleware
 app.Use(async (context, next) =>
 {
-    // Allow WASM for Argon2 and Web Workers
-    context.Response.Headers.Append("Content-Security-Policy",
-        "default-src 'self'; " +
-        "script-src 'self' 'wasm-unsafe-eval'; " +
-        "worker-src 'self' blob:; " +
-        "style-src 'self' 'unsafe-inline';");
-
-    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
-    context.Response.Headers.Append("X-Frame-Options", "DENY");
-    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
-
+    // Add headers here using context.Response.Headers.Append()
     await next();
 });
-
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-app.UseRouting();
-app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
-
-app.Run();
 ```
+
+**Important:** Add this middleware BEFORE `app.UseStaticFiles()`
 
 ---
 
