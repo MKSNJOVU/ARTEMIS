@@ -202,39 +202,94 @@ This is the heart of your encryption system. You need to implement 3 functions t
 
 ### Function 1: `deriveKey(password, salt)`
 
-**Purpose:** Send password + salt to the Web Worker, get back derived key bytes, convert to CryptoKey
+```
+Function: deriveKey(password, salt)
 
-**This function must:**
-1. Return a Promise (the worker communication is async)
-2. Get the worker using your helper function
-3. Set up `worker.onmessage` handler to receive the result
-4. Set up `worker.onerror` handler for failures
-5. Send data to worker with `worker.postMessage()`
-6. When worker responds successfully, use `crypto.subtle.importKey()` to convert raw bytes to a CryptoKey
+Purpose: Send password + salt to the Web Worker, receive derived key bytes,
+         convert raw bytes to a CryptoKey object for use with Web Crypto API.
 
-**Key concept - `crypto.subtle.importKey()`:**
-```javascript
-// Converts raw key bytes into a CryptoKey object
-crypto.subtle.importKey(
-    'raw',                              // format: we have raw bytes
-    keyBytes,                           // the Uint8Array from Argon2
-    { name: 'AES-GCM' },               // algorithm
-    false,                              // extractable: false for security
-    ['encrypt', 'decrypt']              // what operations this key can do
-)
+Logic:
+1. Get worker instance using getArgon2Worker()
+2. Return a new Promise (worker communication is async)
+3. INSIDE the Promise:
+   a. Set up worker.onmessage handler
+      - Destructure response: { success, hash, error }
+      - If success: convert hash to Uint8Array, call crypto.subtle.importKey()
+      - importKey() returns a Promise → .then() call resolve(), .catch() call reject()
+      - If not success: call reject() with error message
+   b. Set up worker.onerror handler
+      - Call reject() with error message
+   c. Call worker.postMessage() with password, salt, and config object
+      - Config contains: iterations, memory, parallelism, keyLength from constants
+
+Concepts to look up:
+- Promise constructor pattern: new Promise((resolve, reject) => { ... })
+- Worker.onmessage event handler
+- Worker.onerror event handler
+- Worker.postMessage() for sending data to worker
+- crypto.subtle.importKey() - converts raw bytes to CryptoKey
+- Variable scope: resolve/reject only exist inside Promise callback
 ```
 
-**Data to send to worker:**
+**Documentation:**
+- https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/importKey
+- https://developer.mozilla.org/en-US/docs/Web/API/Worker/postMessage
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise
+
+**Code Shell:**
 ```javascript
-{
-    password: password,
-    salt: salt,
-    config: {
-        iterations: /* from constants */,
-        memory: /* from constants */,
-        parallelism: /* from constants */,
-        keyLength: /* from constants - KEY_SIZE_BYTES */
-    }
+export async function deriveKey(password, salt) {
+    const worker = getArgon2Worker();
+
+    return new Promise((resolve, reject) => {
+        // ─────────────────────────────────────────────
+        // Step 3a: Handle successful response from worker
+        // ─────────────────────────────────────────────
+        worker.onmessage = function(event) {
+            const { success, hash, error } = event.data;
+
+            if (success) {
+                const keyBytes = new Uint8Array(hash);
+
+                crypto.subtle.importKey(
+                    'raw',
+                    keyBytes,
+                    { name: /* TODO: algorithm from constants */ },
+                    false,
+                    /* TODO: key usage array from constants */
+                )
+                .then(function(cryptoKey) {
+                    resolve(cryptoKey);
+                })
+                .catch(function(err) {
+                    reject(new Error('Failed to import key: ' + err.message));
+                });
+            } else {
+                reject(new Error('Argon2 failed: ' + error));
+            }
+        };
+
+        // ─────────────────────────────────────────────
+        // Step 3b: Handle worker crash/error
+        // ─────────────────────────────────────────────
+        worker.onerror = function(event) {
+            reject(new Error('Worker error: ' + event.message));
+        };
+
+        // ─────────────────────────────────────────────
+        // Step 3c: Send work to the worker
+        // ─────────────────────────────────────────────
+        worker.postMessage({
+            password: password,
+            salt: salt,
+            config: {
+                iterations: /* TODO */,
+                memory: /* TODO */,
+                parallelism: /* TODO */,
+                keyLength: /* TODO */
+            }
+        });
+    });
 }
 ```
 
@@ -242,91 +297,208 @@ crypto.subtle.importKey(
 
 ### Function 2: `encrypt(plaintext, password, onProgress)`
 
-**Purpose:** Encrypt an ArrayBuffer and return format: `[Salt][IV][Ciphertext+AuthTag]`
+```
+Function: encrypt(plaintext, password, onProgress = null)
 
-**Compare to your Kotlin `EncryptionManager.encrypt()`** - the logic is nearly identical:
+Purpose: Encrypt an ArrayBuffer using AES-256-GCM with password-derived key.
+         Output format: [Salt: 16 bytes][IV: 12 bytes][Ciphertext][AuthTag: 16 bytes]
 
-**Steps to implement:**
-1. Generate random salt (16 bytes) using `crypto.getRandomValues(new Uint8Array(...))`
-2. Call `deriveKey()` with password and salt (use `await`)
-3. Generate random IV (12 bytes) using `crypto.getRandomValues()`
-4. Call `crypto.subtle.encrypt()` with AES-GCM parameters
-5. Assemble the output by concatenating salt + iv + ciphertext
+         Compare to your Kotlin EncryptionManager.encrypt() - the logic is nearly identical.
 
-**Key concept - `crypto.subtle.encrypt()`:**
-```javascript
-const ciphertext = await crypto.subtle.encrypt(
-    {
-        name: 'AES-GCM',
-        iv: iv,                         // your 12-byte IV
-        tagLength: 128                  // auth tag size in bits
-    },
-    key,                                // CryptoKey from deriveKey()
-    plaintext                           // ArrayBuffer to encrypt
-);
-// Note: ciphertext includes the auth tag automatically appended
+Logic:
+1. Generate random salt (16 bytes) using crypto.getRandomValues()
+2. Derive AES key from password + salt using deriveKey() (await it)
+3. Generate random IV (12 bytes) using crypto.getRandomValues()
+4. Encrypt plaintext using crypto.subtle.encrypt() with AES-GCM parameters
+   - Note: GCM automatically appends auth tag to ciphertext
+5. Assemble output buffer: concatenate salt + iv + ciphertext
+   - Create Uint8Array of total size
+   - Use .set(array, offset) to copy each piece at correct position
+6. Return result.buffer (ArrayBuffer)
+
+Progress reporting (if onProgress provided):
+- 10%: "Generating salt..."
+- 15%: "Deriving key..."
+- 50%: "Encrypting..."
+- 90%: "Assembling output..."
+- 100%: "Done!"
+
+Concepts to look up:
+- crypto.getRandomValues() - cryptographically secure random bytes
+- crypto.subtle.encrypt() - Web Crypto encryption
+- Uint8Array.set(array, offset) - copy array at position
+- ArrayBuffer vs Uint8Array - buffer is raw memory, Uint8Array is a view
 ```
 
-**Key concept - Concatenating Uint8Arrays:**
-```javascript
-// Create result array of correct total size
-const result = new Uint8Array(totalSize);
-// Copy salt at position 0
-result.set(salt, 0);
-// Copy iv at position after salt
-result.set(iv, saltSize);
-// Copy ciphertext at position after salt+iv
-result.set(new Uint8Array(ciphertext), saltSize + ivSize);
-// Return as ArrayBuffer
-return result.buffer;
-```
+**Documentation:**
+- https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/encrypt
+- https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/set
 
-**Progress reporting:** If `onProgress` is provided, call it at key points:
-- `onProgress(10, 'Generating salt...')`
-- `onProgress(15, 'Deriving key...')`
-- `onProgress(50, 'Encrypting...')`
-- `onProgress(100, 'Done!')`
+**Code Shell:**
+```javascript
+export async function encrypt(plaintext, password, onProgress = null) {
+    // ─────────────────────────────────────────────
+    // Step 1: Generate random salt
+    // ─────────────────────────────────────────────
+    const salt = crypto.getRandomValues(new Uint8Array(/* TODO: SALT_SIZE */));
+
+    if (onProgress) onProgress(10, 'Generating salt...');
+
+    // ─────────────────────────────────────────────
+    // Step 2: Derive key from password + salt
+    // ─────────────────────────────────────────────
+    if (onProgress) onProgress(15, 'Deriving key...');
+    const key = await deriveKey(password, salt);
+
+    // ─────────────────────────────────────────────
+    // Step 3: Generate random IV
+    // ─────────────────────────────────────────────
+    const iv = crypto.getRandomValues(new Uint8Array(/* TODO: IV_SIZE */));
+
+    if (onProgress) onProgress(50, 'Encrypting...');
+
+    // ─────────────────────────────────────────────
+    // Step 4: Encrypt using AES-GCM
+    // ─────────────────────────────────────────────
+    const ciphertext = await crypto.subtle.encrypt(
+        {
+            name: /* TODO: ALGORITHM */,
+            iv: iv,
+            tagLength: /* TODO: TAG_SIZE */
+        },
+        key,
+        plaintext
+    );
+
+    if (onProgress) onProgress(90, 'Assembling output...');
+
+    // ─────────────────────────────────────────────
+    // Step 5: Assemble output [salt][iv][ciphertext]
+    // ─────────────────────────────────────────────
+    const result = new Uint8Array(
+        /* TODO: SALT_SIZE + IV_SIZE + ciphertext.byteLength */
+    );
+
+    result.set(salt, 0);
+    result.set(iv, /* TODO: offset after salt */);
+    result.set(new Uint8Array(ciphertext), /* TODO: offset after salt + iv */);
+
+    if (onProgress) onProgress(100, 'Done!');
+
+    return result.buffer;
+}
+```
 
 ---
 
 ### Function 3: `decrypt(encrypted, password, onProgress)`
 
-**Purpose:** Decrypt data in format `[Salt][IV][Ciphertext+AuthTag]`
+```
+Function: decrypt(encrypted, password, onProgress = null)
 
-**Compare to your Kotlin `EncryptionManager.decrypt()`**
+Purpose: Decrypt data in format [Salt][IV][Ciphertext+AuthTag]
+         Returns the original plaintext as ArrayBuffer.
 
-**Steps to implement:**
-1. Convert input to Uint8Array: `const data = new Uint8Array(encrypted)`
-2. Validate minimum size (salt + iv + tag = 44 bytes minimum)
-3. Extract salt: `data.slice(0, SALT_SIZE)`
-4. Extract IV: `data.slice(SALT_SIZE, SALT_SIZE + IV_SIZE)`
-5. Extract ciphertext: `data.slice(SALT_SIZE + IV_SIZE)`
-6. Derive key using extracted salt
-7. Call `crypto.subtle.decrypt()`
-8. Handle errors - wrong password throws an exception
+         Compare to your Kotlin EncryptionManager.decrypt() - the logic is nearly identical.
 
-**Key concept - `crypto.subtle.decrypt()`:**
-```javascript
-try {
-    const plaintext = await crypto.subtle.decrypt(
-        {
-            name: 'AES-GCM',
-            iv: iv,
-            tagLength: 128
-        },
-        key,
-        ciphertext
-    );
-    return plaintext;
-} catch (error) {
-    // Auth tag verification failed = wrong password or tampered data
-    throw new Error('Decryption failed. Wrong password or corrupted file.');
-}
+Logic:
+1. Convert encrypted ArrayBuffer to Uint8Array (needed for slicing)
+2. Validate minimum size: salt(16) + iv(12) + tag(16) = 44 bytes minimum
+   - If too short, throw Error
+3. Extract salt: slice bytes 0 to SALT_SIZE
+4. Extract IV: slice bytes SALT_SIZE to (SALT_SIZE + IV_SIZE)
+5. Extract ciphertext: slice bytes from (SALT_SIZE + IV_SIZE) to end
+6. Derive key using deriveKey(password, salt) - same salt that was used to encrypt
+7. Decrypt using crypto.subtle.decrypt() with AES-GCM parameters
+   - MUST wrap in try/catch
+   - If auth tag fails (wrong password), crypto.subtle.decrypt() throws
+   - Catch and throw user-friendly error message
+
+Progress reporting (if onProgress provided):
+- 10%: "Extracted salt..."
+- 15%: "Deriving key..."
+- 50%: "Decrypting..."
+- 100%: "Done!"
+
+Concepts to look up:
+- Uint8Array.slice(start, end) - extracts portion of array
+- crypto.subtle.decrypt() - Web Crypto decryption
+- try/catch for handling decryption failures
+- GCM auth tag verification happens automatically in decrypt()
 ```
 
-**Research:**
-- What does `Uint8Array.slice()` do?
-- What's the difference between `ArrayBuffer` and `Uint8Array`?
+**Documentation:**
+- https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/decrypt
+- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Uint8Array/slice
+
+**Code Shell:**
+```javascript
+export async function decrypt(encrypted, password, onProgress = null) {
+    // ─────────────────────────────────────────────
+    // Step 1: Convert to Uint8Array for slicing
+    // ─────────────────────────────────────────────
+    const data = new Uint8Array(encrypted);
+
+    // ─────────────────────────────────────────────
+    // Step 2: Validate minimum size
+    // ─────────────────────────────────────────────
+    if (data.length < 44) {
+        throw new Error('Invalid encrypted data: too short');
+    }
+
+    // ─────────────────────────────────────────────
+    // Step 3: Extract salt (first 16 bytes)
+    // ─────────────────────────────────────────────
+    const salt = data.slice(0, /* TODO: SALT_SIZE */);
+
+    if (onProgress) onProgress(10, 'Extracted salt...');
+
+    // ─────────────────────────────────────────────
+    // Step 4: Extract IV (next 12 bytes)
+    // ─────────────────────────────────────────────
+    const iv = data.slice(
+        /* TODO: start after salt */,
+        /* TODO: end after salt + iv */
+    );
+
+    // ─────────────────────────────────────────────
+    // Step 5: Extract ciphertext + auth tag (remainder)
+    // ─────────────────────────────────────────────
+    const ciphertext = data.slice(/* TODO: start after salt + iv */);
+
+    if (onProgress) onProgress(15, 'Deriving key...');
+
+    // ─────────────────────────────────────────────
+    // Step 6: Derive key using extracted salt
+    // ─────────────────────────────────────────────
+    const key = await deriveKey(password, salt);
+
+    if (onProgress) onProgress(50, 'Decrypting...');
+
+    // ─────────────────────────────────────────────
+    // Step 7: Decrypt with try/catch for auth failure
+    // ─────────────────────────────────────────────
+    try {
+        const plaintext = await crypto.subtle.decrypt(
+            {
+                name: /* TODO: ALGORITHM */,
+                iv: iv,
+                tagLength: /* TODO: TAG_SIZE */
+            },
+            key,
+            ciphertext
+        );
+
+        if (onProgress) onProgress(100, 'Done!');
+
+        return plaintext;
+    } catch (error) {
+        // Auth tag verification failed = wrong password or tampered data
+        throw new Error('Decryption failed. Wrong password or corrupted file.');
+    }
+}
+```
 
 ---
 
@@ -343,59 +515,125 @@ Remember to `export` the functions that other modules need:
 
 **Path:** `wwwroot/js/crypto/file-handler.js`
 
-This module handles reading files from user input and triggering downloads. You need to implement 4 functions.
+This module handles reading files from user input and triggering downloads.
+
+---
 
 ### Function 1: `readFile(file, onProgress)`
 
-**Purpose:** Read a File object (from `<input type="file">`) into an ArrayBuffer
+```
+Function: readFile(file, onProgress = null)
 
-**Concepts to research:**
-- `FileReader` API - how browsers read files: https://developer.mozilla.org/en-US/docs/Web/API/FileReader
-- `readAsArrayBuffer()` method - we need raw bytes, not text
-- `Promise` - wrap the async FileReader in a Promise so we can use `await`
-- FileReader events: `onload`, `onerror`, `onprogress`
+Purpose: Read a File object (from <input type="file">) into an ArrayBuffer.
+         Uses FileReader API wrapped in a Promise for async/await compatibility.
 
-**Function signature:**
-```javascript
-export function readFile(file, onProgress = null) {
-    // Return a Promise that:
-    // 1. Creates a FileReader
-    // 2. Sets up onload to resolve with reader.result
-    // 3. Sets up onerror to reject with an Error
-    // 4. If onProgress provided, set up onprogress to report percentage
-    // 5. Calls reader.readAsArrayBuffer(file)
-}
+Logic:
+1. Return a new Promise
+2. Inside Promise: create a FileReader instance
+3. Set up reader.onload handler
+   - When file is read, resolve() with reader.result
+4. Set up reader.onerror handler
+   - If read fails, reject() with an Error
+5. If onProgress provided, set up reader.onprogress handler
+   - Calculate percentage: (event.loaded / event.total) * 100
+   - Call onProgress(percent, 'Reading file...')
+6. Call reader.readAsArrayBuffer(file) to start reading
+
+Concepts to look up:
+- FileReader API and its event handlers
+- FileReader.readAsArrayBuffer() method
+- Promise constructor pattern
+- ProgressEvent for tracking load progress
 ```
 
-**Hint:** The Promise constructor pattern:
+**Documentation:**
+- https://developer.mozilla.org/en-US/docs/Web/API/FileReader
+- https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsArrayBuffer
+
+**Code Shell:**
 ```javascript
-return new Promise((resolve, reject) => {
-    // resolve(value) when successful
-    // reject(error) when failed
-});
+export function readFile(file, onProgress = null) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = function() {
+            // TODO: resolve with reader.result
+        };
+
+        reader.onerror = function() {
+            // TODO: reject with an Error
+        };
+
+        if (onProgress) {
+            reader.onprogress = function(event) {
+                if (event.lengthComputable) {
+                    // TODO: calculate percent, call onProgress
+                }
+            };
+        }
+
+        // TODO: start reading the file
+    });
+}
 ```
 
 ---
 
 ### Function 2: `downloadBlob(data, filename, mimeType)`
 
-**Purpose:** Trigger a file download in the browser from an ArrayBuffer
+```
+Function: downloadBlob(data, filename, mimeType = 'application/octet-stream')
 
-**Concepts to research:**
-- `Blob` - binary data container: https://developer.mozilla.org/en-US/docs/Web/API/Blob
-- `URL.createObjectURL()` - creates a temporary URL for a Blob
-- `URL.revokeObjectURL()` - clean up when done (memory management)
-- Creating and clicking an `<a>` element programmatically
-- The `download` attribute on anchor elements
+Purpose: Trigger a file download in the browser from an ArrayBuffer.
+         Creates a temporary link, clicks it, then cleans up.
 
-**Function signature:**
+Logic:
+1. Create a Blob from the data with the given mimeType
+2. Create an object URL for the blob using URL.createObjectURL()
+3. Create an <a> element
+4. Set href to the object URL
+5. Set download attribute to the filename
+6. Append link to document body
+7. Programmatically click the link
+8. Remove link from document body
+9. Revoke the object URL after a short delay (memory cleanup)
+
+Concepts to look up:
+- Blob constructor
+- URL.createObjectURL() and URL.revokeObjectURL()
+- Creating elements with document.createElement()
+- HTMLAnchorElement download attribute
+- setTimeout for delayed cleanup
+```
+
+**Documentation:**
+- https://developer.mozilla.org/en-US/docs/Web/API/Blob
+- https://developer.mozilla.org/en-US/docs/Web/API/URL/createObjectURL
+
+**Code Shell:**
 ```javascript
 export function downloadBlob(data, filename, mimeType = 'application/octet-stream') {
-    // 1. Create a Blob from the data with the given mimeType
-    // 2. Create an object URL for the blob
-    // 3. Create an <a> element with href=url and download=filename
-    // 4. Append to document, click it, remove it
-    // 5. Revoke the object URL to free memory (use setTimeout)
+    // Step 1: Create Blob
+    const blob = new Blob([data], { type: mimeType });
+
+    // Step 2: Create object URL
+    const url = URL.createObjectURL(blob);
+
+    // Steps 3-5: Create and configure link
+    const link = document.createElement('a');
+    // TODO: set link.href
+    // TODO: set link.download
+
+    // Steps 6-7: Add to DOM and click
+    // TODO: appendChild, click()
+
+    // Step 8: Remove from DOM
+    // TODO: removeChild
+
+    // Step 9: Cleanup after delay
+    setTimeout(function() {
+        // TODO: revoke the URL
+    }, 100);
 }
 ```
 
@@ -403,26 +641,48 @@ export function downloadBlob(data, filename, mimeType = 'application/octet-strea
 
 ### Function 3: `getEncryptedFilename(originalName)`
 
-**Purpose:** Add `.enc` extension to a filename
+```
+Function: getEncryptedFilename(originalName)
 
-**This one is simple:** Just concatenate `.enc` to the original name and return it.
+Purpose: Add .enc extension to a filename.
+
+Logic:
+1. Concatenate ".enc" to the original name
+2. Return the result
+
+Example: "document.pdf" → "document.pdf.enc"
+```
 
 ---
 
 ### Function 4: `getDecryptedFilename(encryptedName)`
 
-**Purpose:** Remove `.enc` extension, or add `decrypted_` prefix if no `.enc`
-
-**Concepts to research:**
-- `String.endsWith()` - check if string ends with a suffix
-- `String.slice()` - extract part of a string (negative index removes from end)
-
-**Logic:**
 ```
-if filename ends with ".enc":
-    return filename without the last 4 characters
-else:
-    return "decrypted_" + filename
+Function: getDecryptedFilename(encryptedName)
+
+Purpose: Remove .enc extension from filename, or add prefix if no .enc
+
+Logic:
+1. Check if filename ends with ".enc"
+2. If yes: return filename without the last 4 characters
+3. If no: return "decrypted_" + filename
+
+Concepts to look up:
+- String.endsWith() method
+- String.slice() with negative index
+
+Example: "document.pdf.enc" → "document.pdf"
+Example: "unknown_file" → "decrypted_unknown_file"
+```
+
+**Code Shell:**
+```javascript
+export function getDecryptedFilename(encryptedName) {
+    if (encryptedName.endsWith('.enc')) {
+        // TODO: return without last 4 characters
+    }
+    // TODO: return with prefix
+}
 ```
 
 ---
@@ -508,55 +768,147 @@ Similar to Encrypt view but simpler:
 
 **Path:** `wwwroot/js/ui/encrypt-ui.js`
 
-**Purpose:** Wire up the encrypt form to your crypto functions
+```
+File: encrypt-ui.js
 
-**Documentation to study:**
-- `document.getElementById()`: https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementById
-- `addEventListener()`: https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
-- Form `submit` event: https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/submit_event
-- `event.preventDefault()`: Stop form from submitting normally
-- File input `change` event and `e.target.files[0]`
+Purpose: Wire up the encrypt form to the crypto functions.
+         Handles user interaction: file selection, password validation,
+         progress display, and triggering the download.
 
-**Imports needed:**
-```javascript
-import { encrypt } from '../crypto/crypto-core.js';
-import { readFile, downloadBlob, getEncryptedFilename } from '../crypto/file-handler.js';
+Imports needed:
+- encrypt from crypto-core.js
+- readFile, downloadBlob, getEncryptedFilename from file-handler.js
+
+Module structure:
+1. Import statements
+2. Get references to DOM elements (getElementById)
+3. Module-level variable for selected file
+4. Event handlers
+5. Helper functions
+
+DOM Elements to reference:
+- form (id="encrypt-form")
+- fileInput (id="file-input")
+- fileInfo (id="file-info")
+- password (id="password")
+- passwordConfirm (id="password-confirm")
+- passwordError (id="password-error")
+- progressContainer (id="progress-container")
+- progressFill (id="progress-fill")
+- progressText (id="progress-text")
+- encryptBtn (id="encrypt-btn")
+- errorContainer (id="error-container")
+- errorMessage (id="error-message")
 ```
 
-**Elements to get references to:**
-- form, fileInput, fileInfo, password, passwordConfirm, passwordError
-- progressContainer, progressFill, progressText
-- encryptBtn, errorContainer, errorMessage
+---
 
-**Event handlers to implement:**
+### Event Handler 1: File Input Change
 
-1. **File input `change` handler:**
-   - Store selected file in a module-level variable
-   - Display filename and size in the file-info div
-   - Research: How to get file size in MB? (`file.size` is in bytes)
+```
+Event: fileInput 'change'
 
-2. **Password confirm `input` handler:**
-   - Compare password and passwordConfirm values
-   - Show/hide error text if they don't match
+Purpose: When user selects a file, store it and display info.
 
-3. **Form `submit` handler (async):**
-   - Call `e.preventDefault()` to stop normal form submission
-   - Validate: passwords match? file selected?
-   - Disable button, show progress container
-   - Use try/catch/finally:
-     - `try`: Read file → Encrypt → Download result
-     - `catch`: Show error message
-     - `finally`: Re-enable button
+Logic:
+1. Get selected file from e.target.files[0]
+2. Store in module-level variable (let selectedFile)
+3. If file exists:
+   - Calculate size in MB: file.size / (1024 * 1024)
+   - Display filename and size in fileInfo element
+4. If no file: clear fileInfo text
 
-**Helper functions to create:**
-- `updateProgress(percent, message)` - Update progress bar width and text
-- `showError(message)` - Show error container with message
-- `hideError()` - Hide error container
+Concepts to look up:
+- File object properties: name, size
+- Number.toFixed() for decimal places
+- Template literals: `${variable}`
+- Element.textContent property
+```
 
-**Research:**
-- How to set an element's `hidden` attribute?
-- How to set CSS width as a percentage via JavaScript?
-- How to disable a button via JavaScript?
+---
+
+### Event Handler 2: Password Confirm Input
+
+```
+Event: passwordConfirm 'input'
+
+Purpose: Real-time validation that passwords match.
+
+Logic:
+1. Compare password.value to passwordConfirm.value
+2. If they don't match: show error text in passwordError
+3. If they match: clear passwordError text
+
+Concepts to look up:
+- Input element .value property
+- Comparing strings in JavaScript
+```
+
+---
+
+### Event Handler 3: Form Submit
+
+```
+Event: form 'submit' (async handler)
+
+Purpose: Handle the encryption process when user clicks Encrypt.
+
+Logic:
+1. Call e.preventDefault() - stop normal form submission
+2. Call hideError() - clear any previous errors
+3. Validate:
+   - If passwords don't match: showError() and return
+   - If no file selected: showError() and return
+4. Disable the encrypt button (encryptBtn.disabled = true)
+5. Show progress container (progressContainer.hidden = false)
+6. Try block:
+   a. Update progress (5%, 'Reading file...')
+   b. Read file: const plaintext = await readFile(selectedFile)
+   c. Encrypt: const encrypted = await encrypt(plaintext, password.value, updateProgress)
+   d. Generate filename: getEncryptedFilename(selectedFile.name)
+   e. Trigger download: downloadBlob(encrypted, filename)
+   f. Update progress (100%, 'Complete!')
+7. Catch block:
+   - Call showError() with error message
+   - console.error(error) for debugging
+8. Finally block:
+   - Re-enable button (encryptBtn.disabled = false)
+
+Concepts to look up:
+- async function and await keyword
+- try/catch/finally pattern
+- Event.preventDefault()
+- HTMLButtonElement.disabled property
+- HTMLElement.hidden property
+```
+
+---
+
+### Helper Functions
+
+```
+Function: updateProgress(percent, message)
+Purpose: Update the progress bar and status text.
+Logic:
+- Set progressFill.style.width = percent + '%'
+- Set progressText.textContent = message
+
+Function: showError(message)
+Purpose: Display error message to user.
+Logic:
+- Set errorContainer.hidden = false
+- Set errorMessage.textContent = message
+
+Function: hideError()
+Purpose: Hide the error container.
+Logic:
+- Set errorContainer.hidden = true
+```
+
+**Documentation:**
+- https://developer.mozilla.org/en-US/docs/Web/API/Document/getElementById
+- https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener
+- https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/submit_event
 
 ---
 
@@ -564,16 +916,75 @@ import { readFile, downloadBlob, getEncryptedFilename } from '../crypto/file-han
 
 **Path:** `wwwroot/js/ui/decrypt-ui.js`
 
-**Similar to encrypt-ui.js but:**
-- Import `decrypt` instead of `encrypt`
-- Import `getDecryptedFilename` instead of `getEncryptedFilename`
-- No password confirmation field
-- Different validation (just check file and password exist)
+```
+File: decrypt-ui.js
 
-**The submit handler flow:**
-1. Read encrypted file
-2. Decrypt with password
-3. Download decrypted result
+Purpose: Wire up the decrypt form to the crypto functions.
+         Similar to encrypt-ui.js but simpler (no password confirmation).
+
+Imports needed:
+- decrypt from crypto-core.js
+- readFile, downloadBlob, getDecryptedFilename from file-handler.js
+
+DOM Elements to reference:
+- form (id="decrypt-form")
+- fileInput (id="encrypted-file")
+- fileInfo (id="file-info")
+- password (id="password")
+- progressContainer, progressFill, progressText
+- decryptBtn (id="decrypt-btn")
+- errorContainer, errorMessage
+```
+
+---
+
+### Event Handler 1: File Input Change
+
+```
+Event: fileInput 'change'
+
+Purpose: When user selects encrypted file, store it and display info.
+
+Logic: Same as encrypt-ui.js
+1. Store file from e.target.files[0]
+2. Display filename and size
+```
+
+---
+
+### Event Handler 2: Form Submit
+
+```
+Event: form 'submit' (async handler)
+
+Purpose: Handle the decryption process.
+
+Logic:
+1. e.preventDefault()
+2. hideError()
+3. Validate:
+   - If no file selected: showError() and return
+   - If no password: showError() and return
+4. Disable button, show progress
+5. Try block:
+   a. Read file: const encrypted = await readFile(selectedFile)
+   b. Decrypt: const plaintext = await decrypt(encrypted, password.value, updateProgress)
+   c. Generate filename: getDecryptedFilename(selectedFile.name)
+   d. Download: downloadBlob(plaintext, filename)
+6. Catch block:
+   - showError(error.message) - will show "Wrong password or corrupted file"
+7. Finally block:
+   - Re-enable button
+```
+
+---
+
+### Helper Functions
+
+Same as encrypt-ui.js:
+- updateProgress(percent, message)
+- showError(message)
+- hideError()
 
 ---
 
