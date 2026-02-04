@@ -21,32 +21,40 @@ async function deriveKey(password, salt) {
   const argon2Worker = getArgon2Worker();
 
   return new Promise((resolve, reject) => {
-    argon2Worker.onmessage = function (event) {
-      const { success, hash, error } = event.data;
-      if (success) {
-        const keyBytes = new Uint8Array(hash);
-        crypto.subtle
-          .importKey(
-            "raw",
-            keyBytes,
-            { name: CryptoConstants.ALGORITHM },
-            false,
-            CryptoConstants.KEY_USAGE,
-          )
-          .then((cryptoKey) => {
-            resolve(cryptoKey);
-          })
-          .catch((error) => {
-            reject(error);
-          });
-      } else {
-        reject(new Error("Argon2id failed: " + error));
-      }
-    };
+    argon2Worker.addEventListener(
+      "message",
+      (event) => {
+        const { success, hash, error } = event.data;
+        if (success) {
+          const keyBytes = new Uint8Array(hash);
+          crypto.subtle
+            .importKey(
+              "raw",
+              keyBytes,
+              { name: CryptoConstants.ALGORITHM },
+              false,
+              CryptoConstants.KEY_USAGE,
+            )
+            .then((cryptoKey) => {
+              resolve(cryptoKey);
+            })
+            .catch((error) => {
+              reject(error);
+            });
+        } else {
+          reject(new Error("Argon2id failed: " + error));
+        }
+      },
+      { once: true },
+    );
     // Handle worker crash/error
-    argon2Worker.onerror = function (event) {
-      reject(new Error("Worker error " + event.message));
-    };
+    argon2Worker.addEventListener(
+      "error",
+      (event) => {
+        reject(new Error("Worker error " + event.message));
+      },
+      { once: true },
+    );
     // Send work to the Argon2Worker
     argon2Worker.postMessage({
       password: password,
