@@ -131,11 +131,11 @@ export async function decrypt(encrypted, password, onProgress = null) {
     throw new Error("Invalid Entry! Data is corrupted or tampered with.");
   }
 
-  // Getting the Encrypted SALT
+  // Getting the SALT
   const salt = encryptedData.slice(0, CryptoConstants.SALT_SIZE);
   if (onProgress) onProgress(10, "Extracted salt...");
 
-  // Getting the Encrypted IV
+  // Getting the IV
   const extractedIV = encryptedData.slice(
     CryptoConstants.SALT_SIZE,
     CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
@@ -166,6 +166,8 @@ export async function decrypt(encrypted, password, onProgress = null) {
     if (onProgress) onProgress(100, "Done! :tada:");
     return plaintext;
   } catch (error) {
-    throw new Error("Invalid Tag! Wrong password or file is tampered with.", { cause: error });
+    throw new Error("Invalid Tag! Wrong password or file is tampered with.", {
+      cause: error,
+    });
   }
 }
