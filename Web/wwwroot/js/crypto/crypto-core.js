@@ -63,7 +63,7 @@ async function deriveKey(password, salt) {
         iterations: CryptoConstants.ITERATIONS,
         memory: CryptoConstants.MEMORY,
         parallelism: CryptoConstants.PARALLELISM,
-        keyLength: CryptoConstants.KEY_SIZE,
+        keyLength: CryptoConstants.KEY_SIZE_BYTES,
       },
     });
   });
@@ -115,4 +115,39 @@ export async function encrypt(plaintext, password, onProgress = null) {
   if (onProgress) onProgress(100, "Done!");
 
   return encryptedResult.buffer;
+}
+
+export async function decrypt(encrypted, password, onProgress = null) {
+  const encryptedData = new Uint8Array(encrypted);
+
+  if (encryptedData.length < SALT_SIZE + IV_SIZE + TAG_SIZE) {
+    throw new Error("Invalid Entry! Data is corrupted or tampered with.");
+  }
+
+  const salt = encryptedData.slice(0, SALT_SIZE);
+  if (onProgress) onProgress(10, "Extracted salt...");
+
+  const IV = encryptedData.slice(SALT_SIZE, SALT_SIZE + IV_SIZE);
+  const ciphertext = encryptedData.slice(
+    SALT_SIZE + IV_SIZE,
+    encryptedData.length - 1,
+  );
+
+  if (onProgress) onProgress(15, "Deriving key...");
+  const key = await deriveKey(password, salt);
+
+  if (onProgress) onProgress(50, "Decrypting...");
+
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      { name: ALGORITHM, iv: IV, tagLength: TAG_SIZE },
+      key,
+      ciphertext,
+    );
+
+    if (onProgress) onProgress(100, "Done! :tada:");
+    return plaintext;
+  } catch (error) {
+    throw new Error("Invalid Tag! Wrong password or file is tampered with.");
+  }
 }
