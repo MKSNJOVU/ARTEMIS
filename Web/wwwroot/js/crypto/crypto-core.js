@@ -63,7 +63,7 @@ async function deriveKey(password, salt) {
         iterations: CryptoConstants.ITERATIONS,
         memory: CryptoConstants.MEMORY,
         parallelism: CryptoConstants.PARALLELISM,
-        keyLength: CryptoConstants.KEY_SIZE,
+        keyLength: CryptoConstants.KEY_SIZE_BYTES,
       },
     });
   });
@@ -115,4 +115,59 @@ export async function encrypt(plaintext, password, onProgress = null) {
   if (onProgress) onProgress(100, "Done!");
 
   return encryptedResult.buffer;
+}
+
+export async function decrypt(encrypted, password, onProgress = null) {
+  const encryptedData = new Uint8Array(encrypted);
+
+  // Checking the Encrypted Data size
+  if (
+    encryptedData.length <
+    CryptoConstants.SALT_SIZE +
+      CryptoConstants.IV_SIZE +
+      CryptoConstants.TAG_SIZE_BYTES +
+      1
+  ) {
+    throw new Error("Invalid Entry! Data is corrupted or tampered with.");
+  }
+
+  // Getting the SALT
+  const salt = encryptedData.slice(0, CryptoConstants.SALT_SIZE);
+  if (onProgress) onProgress(10, "Extracted salt...");
+
+  // Getting the IV
+  const extractedIV = encryptedData.slice(
+    CryptoConstants.SALT_SIZE,
+    CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
+  );
+
+  // Getting the  Ciphertext
+  const ciphertext = encryptedData.slice(
+    CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
+  );
+
+  // Deriving the key from the password
+  if (onProgress) onProgress(15, "Deriving key...");
+  const key = await deriveKey(password, salt);
+
+  if (onProgress) onProgress(50, "Decrypting...");
+  // Decrypting the data
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      {
+        name: CryptoConstants.ALGORITHM,
+        iv: extractedIV,
+        tagLength: CryptoConstants.TAG_SIZE,
+      },
+      key,
+      ciphertext,
+    );
+
+    if (onProgress) onProgress(100, "Done! :tada:");
+    return plaintext;
+  } catch (error) {
+    throw new Error("Invalid Tag! Wrong password or file is tampered with.", {
+      cause: error,
+    });
+  }
 }
