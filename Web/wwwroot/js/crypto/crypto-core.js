@@ -93,7 +93,7 @@ export async function encrypt(plaintext, password, onProgress = null) {
     {
       name: CryptoConstants.ALGORITHM,
       iv: randomIV,
-      tagLength: CryptoConstants.TAG_SIZE,
+      tagLength: CryptoConstants.TAG_SIZE_BYTES,
     },
     key,
     plaintext,
@@ -120,27 +120,44 @@ export async function encrypt(plaintext, password, onProgress = null) {
 export async function decrypt(encrypted, password, onProgress = null) {
   const encryptedData = new Uint8Array(encrypted);
 
-  if (encryptedData.length < SALT_SIZE + IV_SIZE + TAG_SIZE) {
+  // Checking the Encrypted Data size
+  if (
+    encryptedData.length <
+    CryptoConstants.SALT_SIZE +
+      CryptoConstants.IV_SIZE +
+      CryptoConstants.TAG_SIZE_BYTES
+  ) {
     throw new Error("Invalid Entry! Data is corrupted or tampered with.");
   }
 
-  const salt = encryptedData.slice(0, SALT_SIZE);
+  // Getting the Encrypted SALT
+  const salt = encryptedData.slice(0, CryptoConstants.SALT_SIZE);
   if (onProgress) onProgress(10, "Extracted salt...");
 
-  const IV = encryptedData.slice(SALT_SIZE, SALT_SIZE + IV_SIZE);
-  const ciphertext = encryptedData.slice(
-    SALT_SIZE + IV_SIZE,
-    encryptedData.length - 1,
+  // Getting the Encrypted IV
+  const IV = encryptedData.slice(
+    CryptoConstants.SALT_SIZE,
+    CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
   );
 
+  // Getting the Encrypted Ciphertext
+  const ciphertext = encryptedData.slice(
+    CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
+  );
+
+  // Deriving the key from the password
   if (onProgress) onProgress(15, "Deriving key...");
   const key = await deriveKey(password, salt);
 
   if (onProgress) onProgress(50, "Decrypting...");
-
+  // Decrypting the data
   try {
     const plaintext = await crypto.subtle.decrypt(
-      { name: ALGORITHM, iv: IV, tagLength: TAG_SIZE },
+      {
+        name: CryptoConstants.ALGORITHM,
+        iv: IV,
+        tagLength: CryptoConstants.TAG_SIZE_BYTES,
+      },
       key,
       ciphertext,
     );
