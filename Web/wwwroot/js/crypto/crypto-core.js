@@ -93,7 +93,7 @@ export async function encrypt(plaintext, password, onProgress = null) {
     {
       name: CryptoConstants.ALGORITHM,
       iv: randomIV,
-      tagLength: CryptoConstants.TAG_SIZE_BYTES,
+      tagLength: CryptoConstants.TAG_SIZE,
     },
     key,
     plaintext,
@@ -125,7 +125,8 @@ export async function decrypt(encrypted, password, onProgress = null) {
     encryptedData.length <
     CryptoConstants.SALT_SIZE +
       CryptoConstants.IV_SIZE +
-      CryptoConstants.TAG_SIZE_BYTES
+      CryptoConstants.TAG_SIZE_BYTES +
+      1
   ) {
     throw new Error("Invalid Entry! Data is corrupted or tampered with.");
   }
@@ -135,12 +136,12 @@ export async function decrypt(encrypted, password, onProgress = null) {
   if (onProgress) onProgress(10, "Extracted salt...");
 
   // Getting the Encrypted IV
-  const IV = encryptedData.slice(
+  const extractedIV = encryptedData.slice(
     CryptoConstants.SALT_SIZE,
     CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
   );
 
-  // Getting the Encrypted Ciphertext
+  // Getting the  Ciphertext
   const ciphertext = encryptedData.slice(
     CryptoConstants.SALT_SIZE + CryptoConstants.IV_SIZE,
   );
@@ -155,8 +156,8 @@ export async function decrypt(encrypted, password, onProgress = null) {
     const plaintext = await crypto.subtle.decrypt(
       {
         name: CryptoConstants.ALGORITHM,
-        iv: IV,
-        tagLength: CryptoConstants.TAG_SIZE_BYTES,
+        iv: extractedIV,
+        tagLength: CryptoConstants.TAG_SIZE,
       },
       key,
       ciphertext,
