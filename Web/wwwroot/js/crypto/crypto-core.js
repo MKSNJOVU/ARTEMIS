@@ -165,6 +165,6 @@ export async function decrypt(encrypted, password, onProgress = null) {
     if (onProgress) onProgress(100, "Done! :tada:");
     return plaintext;
   } catch (error) {
-    throw new Error("Invalid Tag! Wrong password or file is tampered with.");
+    throw new Error("Invalid Tag! Wrong password or file is tampered with.", { cause: error });
   }
 }
