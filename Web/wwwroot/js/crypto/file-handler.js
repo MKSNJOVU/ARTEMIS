@@ -20,9 +20,21 @@ export function readFile(file, onProgress = null) {
       });
     }
     // Provide an error if FileReader fails
-    reader.addEventListener("error", function () {
-      reject(new Error("Failed to read the file."));
-    });
+    reader.addEventListener(
+      "error",
+      function (event) {
+        const underlyingError = reader.error || event;
+
+        if (!(underlyingError instanceof Error)) {
+          reject(new Error("Failed to read the file."));
+        } else {
+          reject(
+            new Error("Failed to read the file.", { cause: underlyingError }),
+          );
+        }
+      },
+      { once: true },
+    );
     // Read the file as an ArrayBuffer
     reader.readAsArrayBuffer(file);
   });
