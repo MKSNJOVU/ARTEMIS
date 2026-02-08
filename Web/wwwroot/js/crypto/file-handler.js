@@ -1,23 +1,21 @@
-async function readFile(file, onProgress = null) {
+export function readFile(file, onProgress = null) {
   const reader = new FileReader();
 
   return new Promise((resolve, reject) => {
     reader.addEventListener(
       "load",
       function (event) {
-        resolve(reader.result)
-          });
-        }, 
+        resolve(reader.result);
+      },
       { once: true },
     );
-
     if (onProgress) {
-      reader.onProgress = function (event) {
+      reader.addEventListener("progress", (event) => {
         if (event.lengthComputable) {
-          (event.loaded / event.total) * 100;
+          const percent = (event.loaded / event.total) * 100;
+          onProgress(percent, "Reading the file....");
         }
-      };
-      onProgress(percent, "Reading the file....");
+      });
     }
     reader.addEventListener("error", function () {
       reject(new Error("Failed to read the file."));
