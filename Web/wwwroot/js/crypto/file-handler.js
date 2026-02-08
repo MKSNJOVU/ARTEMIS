@@ -64,3 +64,23 @@ export function downloadBlob(
   // Cleaning up the URL and document
   document.body.removeChild(aElement);
 }
+
+export function getEncryptedFilename(originalName) {
+  const fileTag = ".enc";
+
+  if (originalName.endsWith(fileTag)) {
+    return originalName;
+  }
+  return `${originalName}${fileTag}`;
+}
+
+export function getDecryptedFilename(encryptedName) {
+  const fileTag = ".enc";
+  const filePrefix = "decrypted_";
+
+  if (!encryptedName.endsWith(fileTag)) {
+    return `${filePrefix}${encryptedName}`;
+  } else {
+    return encryptedName.slice(0, -4);
+  }
+}
