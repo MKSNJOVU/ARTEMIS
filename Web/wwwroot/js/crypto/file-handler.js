@@ -48,10 +48,7 @@ export function downloadBlob(
   // append the link to the document body
   document.body.appendChild(aElement);
 
-  // clikcing the link
-  aElement.click();
-
-  // Cleaning up the URL and document
+  // listening for the programmatic click
   const timeout = 300;
 
   aElement.addEventListener(
@@ -61,5 +58,9 @@ export function downloadBlob(
     },
     { once: true },
   );
+  // clikcing the link
+  aElement.click();
+
+  // Cleaning up the URL and document
   document.body.removeChild(aElement);
 }
