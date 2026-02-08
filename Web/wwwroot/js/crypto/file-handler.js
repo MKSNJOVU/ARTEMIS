@@ -81,6 +81,6 @@ export function getDecryptedFilename(encryptedName) {
   if (!encryptedName.endsWith(fileTag)) {
     return `${filePrefix}${encryptedName}`;
   } else {
-    return encryptedName.slice(0, -4);
+    return encryptedName.slice(0, -fileTag.length);
   }
 }
