@@ -44,21 +44,12 @@ Total size = plaintext_length + 44 bytes overhead
 ```
 MKSSecureShare.Web/
 ├── Controllers/
-│   ├── HomeController.cs          (existing)
-│   ├── EncryptController.cs       (new)
-│   └── DecryptController.cs       (new)
-├── Models/
-│   └── ErrorViewModel.cs          (existing)
-├── Views/
-│   ├── Home/                      (existing)
-│   ├── Encrypt/
-│   │   └── Index.cshtml           (new)
-│   ├── Decrypt/
-│   │   └── Index.cshtml           (new)
-│   └── Shared/
-│       ├── _Layout.cshtml         (modify)
-│       └── Error.cshtml           (existing)
+│   ├── EncryptController.cs       (API endpoint - Phase 3)
+│   └── DecryptController.cs       (API endpoint - Phase 3)
 ├── wwwroot/
+│   ├── index.html                 (new - landing page)
+│   ├── encrypt.html               (new - encrypt page)
+│   ├── decrypt.html               (new - decrypt page)
 │   ├── css/
 │   │   └── site.css               (modify)
 │   └── js/
@@ -687,46 +678,42 @@ export function getDecryptedFilename(encryptedName) {
 
 ---
 
-# Phase 2: UI Layer
+# Phase 2: UI Layer (Static HTML + JavaScript)
 
-## Step 2.1: EncryptController.cs
+Since all encryption and decryption happens in the browser, the UI layer is built entirely with static HTML and JavaScript — no server-side rendering. This is the industry standard for zero-knowledge applications.
 
-**Path:** `Controllers/EncryptController.cs`
-
-**Research:** ASP.NET Core MVC Controllers
-- https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/actions
-
-**What to implement:**
-- A simple controller class that inherits from `Controller`
-- One action method `Index()` that returns `View()`
-- Namespace should match your project: `MKSSecureShare.Web.Controllers`
-
-**This is identical to your existing HomeController** - use it as a reference.
+**Architecture:**
+- Static HTML pages served directly from `wwwroot/`
+- JavaScript ES modules handle all UI logic and call your crypto functions
+- No Razor Views — the server never renders page content
+- C# backend serves static files and API endpoints (Phase 3)
 
 ---
 
-## Step 2.2: DecryptController.cs
+## Step 2.1: encrypt.html
 
-**Path:** `Controllers/DecryptController.cs`
+**Path:** `wwwroot/encrypt.html`
 
-Same pattern as EncryptController - create a controller with an `Index()` action.
+A standalone HTML page — no Razor, no server-side rendering. Includes its own `<head>`, navigation, and loads your JavaScript module.
 
----
-
-## Step 2.3: Views/Encrypt/Index.cshtml
-
-**Path:** `Views/Encrypt/Index.cshtml`
-
-**Research:** Razor syntax and HTML forms
-- https://learn.microsoft.com/en-us/aspnet/core/mvc/views/razor
+**Research:**
+- HTML5 document structure: https://developer.mozilla.org/en-US/docs/Learn/HTML/Introduction_to_HTML/Document_and_website_structure
+- What does `type="module"` do for script tags?
 
 **Elements you need to create:**
 
-1. **Page title** - Set `ViewData["Title"]` in a Razor code block
+1. **HTML5 boilerplate** — `<!DOCTYPE html>`, `<html>`, `<head>`, `<body>`
 
-2. **Security notice** - A paragraph explaining that encryption happens in the browser
+2. **`<head>` section:**
+   - Character encoding (`<meta charset="utf-8">`) and viewport meta tags
+   - Page title
+   - Link to `css/site.css`
 
-3. **Form with id="encrypt-form"** containing:
+3. **Navigation** — A `<nav>` element with links to `index.html`, `encrypt.html`, `decrypt.html`
+
+4. **Security notice** — A paragraph explaining that encryption happens in the browser
+
+5. **Form with id="encrypt-form"** containing:
    - File input (`<input type="file" id="file-input">`)
    - A div with `id="file-info"` to show selected filename
    - Password input (`<input type="password" id="password">`)
@@ -738,33 +725,101 @@ Same pattern as EncryptController - create a controller with an `Index()` action
      - Text div `id="progress-text"` for status messages
    - Submit button `id="encrypt-btn"`
 
-4. **Error container** - Hidden div `id="error-container"` with `id="error-message"` inside
+6. **Error container** — Hidden div `id="error-container"` with `id="error-message"` inside
 
-5. **Scripts section** - Load your encrypt-ui.js as a module:
+7. **Script tag** — Load your encrypt-ui.js as a module:
 ```html
-@section Scripts {
-    <script type="module" src="~/js/ui/encrypt-ui.js"></script>
-}
+<script type="module" src="/js/ui/encrypt-ui.js"></script>
 ```
 
-**Research:** What does `type="module"` do for script tags?
+**Code Shell:**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Encrypt - MKSSecureShare</title>
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+    <nav>
+        <!-- TODO: Links to Home, Encrypt, Decrypt -->
+    </nav>
+
+    <main class="crypto-container">
+        <h1>Encrypt a File</h1>
+
+        <div class="security-note">
+            <!-- TODO: Security notice about browser-side encryption -->
+        </div>
+
+        <form id="encrypt-form" class="crypto-form">
+            <!-- TODO: File input + file-info div -->
+            <!-- TODO: Password + password-confirm inputs -->
+            <!-- TODO: password-error div -->
+            <!-- TODO: Progress bar (hidden by default) -->
+            <!-- TODO: Submit button -->
+        </form>
+
+        <!-- TODO: Error container (hidden by default) -->
+    </main>
+
+    <script type="module" src="/js/ui/encrypt-ui.js"></script>
+</body>
+</html>
+```
 
 ---
 
-## Step 2.4: Views/Decrypt/Index.cshtml
+## Step 2.2: decrypt.html
 
-**Path:** `Views/Decrypt/Index.cshtml`
+**Path:** `wwwroot/decrypt.html`
 
-Similar to Encrypt view but simpler:
+Similar to encrypt.html but simpler:
 - File input for `.enc` files (use `accept=".enc"` attribute)
 - Single password field (no confirmation needed)
 - Progress bar and error containers
+- Same navigation structure
 
 **Research:** What does the `accept` attribute do on file inputs?
 
+**Code Shell:**
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Decrypt - MKSSecureShare</title>
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+    <nav>
+        <!-- TODO: Links to Home, Encrypt, Decrypt -->
+    </nav>
+
+    <main class="crypto-container">
+        <h1>Decrypt a File</h1>
+
+        <form id="decrypt-form" class="crypto-form">
+            <!-- TODO: File input with accept=".enc" + file-info div -->
+            <!-- TODO: Password input -->
+            <!-- TODO: Progress bar (hidden by default) -->
+            <!-- TODO: Submit button -->
+        </form>
+
+        <!-- TODO: Error container (hidden by default) -->
+    </main>
+
+    <script type="module" src="/js/ui/decrypt-ui.js"></script>
+</body>
+</html>
+```
+
 ---
 
-## Step 2.5: encrypt-ui.js
+## Step 2.3: encrypt-ui.js
 
 **Path:** `wwwroot/js/ui/encrypt-ui.js`
 
@@ -912,7 +967,7 @@ Logic:
 
 ---
 
-## Step 2.6: decrypt-ui.js
+## Step 2.4: decrypt-ui.js
 
 **Path:** `wwwroot/js/ui/decrypt-ui.js`
 
@@ -988,23 +1043,7 @@ Same as encrypt-ui.js:
 
 ---
 
-## Step 2.7: Update _Layout.cshtml
-
-**Path:** `Views/Shared/_Layout.cshtml`
-
-**What to add:** Navigation links to Encrypt and Decrypt pages
-
-**Research:** ASP.NET Core Tag Helpers for links
-- `asp-controller` attribute
-- `asp-action` attribute
-
-Add to your existing navigation:
-- Link to Encrypt controller, Index action
-- Link to Decrypt controller, Index action
-
----
-
-## Step 2.8: Update site.css
+## Step 2.5: Update site.css
 
 **Path:** `wwwroot/css/site.css`
 
@@ -1040,17 +1079,26 @@ Add to your existing navigation:
 
 ---
 
-## Step 2.9: Update Program.cs
+## Step 2.6: Update Program.cs
 
 **Path:** `Program.cs`
 
-**Purpose:** Add security headers so the browser allows WASM and Web Workers
+**Purpose:** Configure ASP.NET Core to serve static HTML pages and add security headers for WASM and Web Workers. No MVC view routing needed — pages are static files.
 
 **Research:**
+- Static files middleware: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/static-files
+- Default files: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/static-files#serve-default-documents
 - Content Security Policy (CSP): https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
 - ASP.NET Core Middleware: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/middleware
 
-**What to add:** Middleware that sets response headers
+**What to configure:**
+
+1. **Default file serving** — `app.UseDefaultFiles()` makes `wwwroot/index.html` serve as the root page (`/`)
+   - Must be called BEFORE `UseStaticFiles()`
+
+2. **Static file serving** — `app.UseStaticFiles()` serves everything in `wwwroot/`
+
+3. **Security headers middleware** — Add BEFORE `UseDefaultFiles()`:
 
 **Headers needed:**
 1. `Content-Security-Policy` - Must allow:
@@ -1063,29 +1111,164 @@ Add to your existing navigation:
 3. `X-Frame-Options: DENY`
 4. `Referrer-Policy: strict-origin-when-cross-origin`
 
-**Middleware pattern:**
+4. **API routing** — `app.MapControllers()` to enable attribute-routed API controllers (Phase 3)
+
+**Middleware order matters:**
 ```csharp
+// 1. Security headers (FIRST)
 app.Use(async (context, next) =>
 {
     // Add headers here using context.Response.Headers.Append()
     await next();
 });
-```
 
-**Important:** Add this middleware BEFORE `app.UseStaticFiles()`
+// 2. Default files (index.html as root)
+app.UseDefaultFiles();
+
+// 3. Static files (serve wwwroot/)
+app.UseStaticFiles();
+
+// 4. API routing (for Phase 3 controllers)
+app.MapControllers();
+```
 
 ---
 
-# Phase 3: Testing
+# Phase 3: API Controllers (File Sharing)
+
+The controllers serve as API endpoints — they receive, store, and serve **already-encrypted** blobs. They never see plaintext or passwords. This is how zero-knowledge file sharing works: the browser encrypts locally, then sends the opaque encrypted data to the server for storage.
+
+**Flow:**
+```
+Encrypt & Share:
+  Browser JS encrypts file locally
+    → JS calls POST /api/encrypt/upload with encrypted blob
+      → Controller stores blob, returns share ID/link
+
+Download & Decrypt:
+  Recipient opens share link
+    → JS calls GET /api/decrypt/{id} to get encrypted blob
+      → Controller returns the opaque blob
+        → Browser JS decrypts locally with password
+```
+
+---
+
+## Step 3.1: EncryptController.cs
+
+**Path:** `Controllers/EncryptController.cs`
+
+**Research:** ASP.NET Core Web API Controllers
+- https://learn.microsoft.com/en-us/aspnet/core/web-api
+- https://learn.microsoft.com/en-us/aspnet/core/mvc/controllers/actions
+
+**What to implement:**
+- An API controller class (inherits from `ControllerBase`, not `Controller`)
+- `[ApiController]` attribute for automatic model validation
+- `[Route("api/[controller]")]` attribute for routing
+- POST endpoint that accepts an encrypted file upload
+- Returns a share identifier or URL
+
+**Key differences from the Razor pattern:**
+
+| Razor (old) | API (new) |
+|---|---|
+| Inherits `Controller` | Inherits `ControllerBase` |
+| Returns `View()` | Returns `Ok()`, `BadRequest()`, `NotFound()` |
+| No route attribute | `[Route("api/[controller]")]` |
+| Serves HTML pages | Serves JSON/file data |
+
+**Concepts to look up:**
+- Difference between `Controller` and `ControllerBase`
+- `[ApiController]` attribute behavior
+- `[HttpPost]` attribute for POST endpoints
+- `IFormFile` for file uploads
+- Returning `Ok()`, `BadRequest()`, `NotFound()` responses
+
+**Code Shell:**
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+namespace MKSSecureShare.Web.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class EncryptController : ControllerBase
+{
+    private readonly ILogger<EncryptController> _logger;
+
+    public EncryptController(ILogger<EncryptController> logger)
+    {
+        _logger = logger;
+    }
+
+    [HttpPost("upload")]
+    public async Task<IActionResult> Upload(IFormFile encryptedFile)
+    {
+        // TODO: Validate file exists and size limits
+        // TODO: Generate unique ID for this upload
+        // TODO: Save encrypted blob to storage
+        // TODO: Return the share ID or URL
+    }
+}
+```
+
+---
+
+## Step 3.2: DecryptController.cs
+
+**Path:** `Controllers/DecryptController.cs`
+
+**What to implement:**
+- An API controller with `[ApiController]` and `[Route("api/[controller]")]`
+- GET endpoint that retrieves an encrypted blob by ID
+- Returns the encrypted file as a download
+
+**Concepts to look up:**
+- `[HttpGet("{id}")]` for parameterized routes
+- `File()` method for returning file downloads
+- `FileStreamResult` or `FileContentResult`
+
+**Code Shell:**
+```csharp
+using Microsoft.AspNetCore.Mvc;
+
+namespace MKSSecureShare.Web.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class DecryptController : ControllerBase
+{
+    private readonly ILogger<DecryptController> _logger;
+
+    public DecryptController(ILogger<DecryptController> logger)
+    {
+        _logger = logger;
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> Download(string id)
+    {
+        // TODO: Look up encrypted blob by ID
+        // TODO: If not found, return NotFound()
+        // TODO: Return encrypted file as download
+    }
+}
+```
+
+---
+
+# Phase 4: Testing
 
 ## Verification Checklist
 
 ### Local Testing
 - [ ] Run `dotnet run` and navigate to https://localhost:5001
-- [ ] Go to Encrypt page, select a small text file
+- [ ] Verify `index.html` loads as the default page
+- [ ] Navigate to `encrypt.html`, select a small text file
 - [ ] Enter password, confirm password, click Encrypt
 - [ ] Verify .enc file downloads
-- [ ] Go to Decrypt page, upload the .enc file
+- [ ] Navigate to `decrypt.html`, upload the .enc file
 - [ ] Enter same password, click Decrypt
 - [ ] Verify original file downloads with correct content
 
@@ -1101,6 +1284,12 @@ app.Use(async (context, next) =>
 - [ ] Try decrypting with wrong password - should show error
 - [ ] Try decrypting a non-encrypted file - should show error
 - [ ] Try with mismatched passwords on encrypt - should show error
+
+### API Testing (Phase 3)
+- [ ] Upload an encrypted file via POST `/api/encrypt/upload`
+- [ ] Verify share ID is returned
+- [ ] Download encrypted file via GET `/api/decrypt/{id}`
+- [ ] Verify downloaded file matches uploaded file
 
 ---
 
