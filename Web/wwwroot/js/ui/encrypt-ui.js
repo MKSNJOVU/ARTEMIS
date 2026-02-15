@@ -82,8 +82,6 @@ form.addEventListener("submit", async (event) => {
 
     const filename = getEncryptedFilename(selectedFile.name);
 
-    updateProgress(53, "Processing...");
-
     downloadBlob(encrypted, filename);
     updateProgress(100, "Complete!");
   } catch (error) {
