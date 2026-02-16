@@ -43,19 +43,19 @@ form.filename.addEventListener("change", (e) => {
   formElements.fileInfo.textContent = `Selected: ${name} (${size.toFixed(2)} MB)`;
 });
 
-formElements.passwordConfirm.addEventListener("input", (event) => {
+function validatePasswords() {
   const password = formElements.password.value;
   const passwordConfirm = formElements.passwordConfirm.value;
 
-  if (password !== passwordConfirm) {
+  if (password && passwordConfirm && password !== passwordConfirm) {
     formElements.passwordError.textContent = "Passwords do not match!";
-    return;
   } else {
     formElements.passwordError.textContent = "";
-    return;
   }
-});
+}
 
+formElements.password.addEventListener("input", validatePasswords);
+formElements.passwordConfirm.addEventListener("input", validatePasswords);
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError();
