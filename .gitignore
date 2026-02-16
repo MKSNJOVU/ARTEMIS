@@ -14,5 +14,9 @@
 .cxx
 local.properties
 
+# .NET Build results
+[Bb]in/
+[Oo]bj/
+
 # Documentation
 SecureShare_Guide.md

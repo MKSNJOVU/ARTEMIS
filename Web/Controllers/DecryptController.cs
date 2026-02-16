@@ -20,5 +20,6 @@ public class DecryptController : ControllerBase
         // TODO: Look up encrypted blob by ID
         // TODO: If not found, return NotFound()
         // TODO: Return encrypted file as download
+        return Ok(new { message = "response" });
     }
 }
