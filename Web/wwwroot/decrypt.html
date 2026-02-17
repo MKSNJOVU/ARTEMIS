@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DECRYPT</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <nav>
+      <p><a href="/">Back to Home Page</a></p>
+      <p><a href="./encrypt.html">Encrypt</a></p>
+      <p><a href="./decrypt.html">Decrypt</a></p>
+    </nav>
+
+    <main class="crypto-container">
+      <h1>Decrypt a file</h1>
+      <form id="decrypt-form" class="crypto-form">
+        <div>
+          <label for="encrypted-file">Choose a file:</label>
+          <input type="file" id="encrypted-file" accept=".enc" />
+        </div>
+        <div id="file-info"></div>
+
+        <div>
+          <label for="password">Enter your Password</label>
+          <input type="password" id="password" />
+        </div>
+
+        <div class="password-error" id="password-error"></div>
+
+        <div class="progress-container" id="progress-container" hidden>
+          <div class="progress-fill" id="progress-fill"></div>
+          <div class="progress-text" id="progress-text"></div>
+        </div>
+
+        <div>
+          <button id="decrypt-btn">Decrypt</button>
+        </div>
+      </form>
+      <div class="error-container" id="error-container" hidden>
+        <div id="error-message"></div>
+      </div>
+    </main>
+    <script type="module" src="/js/ui/decrypt-ui.js"></script>
+  </body>
+</html>

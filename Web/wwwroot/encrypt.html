@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARTEMIS -- Encryption</title>
+    <link rel="stylesheet" href="/css/site.css" />
+  </head>
+  <body>
+    <nav>
+      <p><a href="/">Back to the Home Page </a></p>
+      <p><a href="./encrypt.html">Encrypt files here </a></p>
+      <p><a href="./decrypt.html">Decrypt files here </a></p>
+    </nav>
+
+    <main class="crypto-container">
+      <h1>Encrypt your File</h1>
+
+      <div class="security-note">
+        All data is encrypted in the browser. Always.
+      </div>
+
+      <form id="encrypt-form" class="crypto-form">
+        <div>
+          <label for="file-input">Choose a file:</label>
+          <input type="file" id="file-input" name="filename" />
+        </div>
+        <div id="file-info"></div>
+        <div>
+          <label for="password">Enter your password:</label>
+          <input type="password" id="password" />
+        </div>
+
+        <div>
+          <label for="password-confirm">Confirm your password:</label>
+          <input type="password" id="password-confirm" />
+        </div>
+
+        <div class="password-error" id="password-error"></div>
+
+        <div class="progress-container" id="progress-container" hidden>
+          <div class="progress-fill" id="progress-fill"></div>
+          <div class="progress-text" id="progress-text"></div>
+        </div>
+
+        <div>
+          <button id="encrypt-btn">Encrypt</button>
+        </div>
+      </form>
+    </main>
+    <div class="error-container" id="error-container" hidden>
+      <div id="error-message"></div>
+    </div>
+    <script type="module" src="/js/ui/encrypt-ui.js"></script>
+  </body>
+</html>
