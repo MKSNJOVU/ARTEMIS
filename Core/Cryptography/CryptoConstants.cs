@@ -5,9 +5,9 @@ public static class CryptoConstants
 {
     #region AES-GCM Constants
     public const int KEYSIZEBYTES = 32;
-    public const int SaltSize = 16;
-    public const int IVSiIVze = 12;
-    public const int TagSize = 16;
+    public const int SALTSIZE = 16;
+    public const int IVSIZE = 12;
+    public const int TAGSIZE = 16;
     #endregion
 
     #region Argon2id Constants

@@ -8,7 +8,7 @@ namespace Artemis.Core.Cryptography;
 public class KeyDerivationService : IKeyDerivationService
 {
     #region Methods
-    public async Task<byte[]> DeriveKey(string password, byte[] salt)
+    public async Task<byte[]> DeriveKeyAsync(string password, byte[] salt)
     {
         var passwordBytes = Encoding.UTF8.GetBytes(password);
 

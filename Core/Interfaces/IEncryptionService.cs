@@ -2,7 +2,7 @@
 
 namespace Artemis.Core.Interfaces;
 
-interface IEncryptionService
+public interface IEncryptionService
 {
     /// <summary>
     /// Uses AES-256-GCM with Argon2id derived key to encrypt plaintext. 
