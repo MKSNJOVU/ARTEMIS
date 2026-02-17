@@ -60,7 +60,17 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
   hideError();
 
-  if (formElements.password.value !== formElements.passwordConfirm.value) {
+  const password = formElements.password.value;
+
+  if (!password) {
+    showError("Password cannot be empty!");
+    return;
+  }
+  if (password.length < 8) {
+    showError("Password must be at least 8 characters long!");
+    return;
+  }
+  if (password !== formElements.passwordConfirm.value) {
     showError("Passwords do not match!");
     return;
   }
@@ -76,7 +86,7 @@ form.addEventListener("submit", async (event) => {
     const plaintext = await readFile(selectedFile);
     const encrypted = await encrypt(
       plaintext,
-      formElements.password.value,
+      password,
       updateProgress,
     );
 
