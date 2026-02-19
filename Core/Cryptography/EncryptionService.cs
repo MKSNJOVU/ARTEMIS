@@ -32,16 +32,38 @@ public class EncryptionService : IEncryptionService
         var ciphertext = new byte[plaintext.Length];
         var authenticationTag = new byte[CryptoConstants.TAGSIZE];
 
-        using var aes = new AesGcm(key);
+        using (var aes = new AesGcm(key, CryptoConstants.TAGSIZE))
+        {
+            aes.Encrypt(randomIV, plaintext, ciphertext, authenticationTag);
+        }
 
-        /* TODO encrypt with aes.Encrypt() and assemble the output */
 
-        return null;
+        // Assemble the output
+        int offset = 0;
+
+        var result = new byte[CryptoConstants.SALTSIZE + CryptoConstants.IVSIZE + ciphertext.Length + CryptoConstants.TAGSIZE];
+        var minimumSize = CryptoConstants.SALTSIZE + CryptoConstants.IVSIZE + CryptoConstants.TAGSIZE;
+
+        Buffer.BlockCopy(randomSalt, offset, result, offset, randomSalt.Length);
+        Buffer.BlockCopy(randomIV, offset, result, randomSalt.Length, randomIV.Length);
+        Buffer.BlockCopy(ciphertext, offset, result, randomSalt.Length + randomIV.Length, ciphertext.Length);
+        Buffer.BlockCopy(authenticationTag, offset, result, randomSalt.Length + randomIV.Length + ciphertext.Length, authenticationTag.Length);
+
+
+        return result;
     }
 
     public async Task<byte[]> DecryptAsync(byte[] encryptedData, string password)
     {
         throw new NotImplementedException();
+
+        /* TODO Decrypt and implement
+
+         var minimumSize = CryptoConstants.SALTSIZE + CryptoConstants.IVSIZE + CryptoConstants.TAGSIZE;
+
+  if (encryptedData.Length < minimumSize)
+      throw new ArgumentException("Invalid encrypted data: too short."); */
+
     }
     #endregion
 }
