@@ -9,7 +9,7 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Private Constants
-    const int _offset = 0;
+    private const int Offset = 0;
     #endregion
 
     #region Constructor
@@ -23,22 +23,22 @@ public class EncryptionService : IEncryptionService
     public async Task<byte[]> EncryptAsync(byte[] plaintext, string password)
     {
         // Generate the randomSalt
-        var randomSalt = new byte[CryptoConstants.SALTSIZE];
+        var randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
 
         // Derive the AES key from password + salt
         var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
         // Generate a random IV 
-        var randomIV = new byte[CryptoConstants.IVSIZE];
+        var randomIV = new byte[CryptoConstants.IvSize];
         RandomNumberGenerator.Fill(randomIV);
 
         // AES-GCM Encryption
         var ciphertext = new byte[plaintext.Length];
-        var authenticationTag = new byte[CryptoConstants.TAGSIZE];
+        var authenticationTag = new byte[CryptoConstants.TagSize];
 
         try
         {
-            using (var aes = new AesGcm(key, CryptoConstants.TAGSIZE))
+            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
                 aes.Encrypt(randomIV, plaintext, ciphertext, authenticationTag);
             }
@@ -50,12 +50,12 @@ public class EncryptionService : IEncryptionService
 
 
         // Assemble the output
-        var result = new byte[CryptoConstants.SALTSIZE + CryptoConstants.IVSIZE + ciphertext.Length + CryptoConstants.TAGSIZE];
+        var result = new byte[CryptoConstants.SaltSize + CryptoConstants.IvSize + ciphertext.Length + CryptoConstants.TagSize];
 
-        Buffer.BlockCopy(randomSalt, _offset, result, _offset, randomSalt.Length);
-        Buffer.BlockCopy(randomIV, _offset, result, randomSalt.Length, randomIV.Length);
-        Buffer.BlockCopy(ciphertext, _offset, result, randomSalt.Length + randomIV.Length, ciphertext.Length);
-        Buffer.BlockCopy(authenticationTag, _offset, result, randomSalt.Length + randomIV.Length + ciphertext.Length, authenticationTag.Length);
+        Buffer.BlockCopy(randomSalt, Offset, result, Offset, randomSalt.Length);
+        Buffer.BlockCopy(randomIV, Offset, result, randomSalt.Length, randomIV.Length);
+        Buffer.BlockCopy(ciphertext, Offset, result, randomSalt.Length + randomIV.Length, ciphertext.Length);
+        Buffer.BlockCopy(authenticationTag, Offset, result, randomSalt.Length + randomIV.Length + ciphertext.Length, authenticationTag.Length);
 
 
         return result;
@@ -64,27 +64,27 @@ public class EncryptionService : IEncryptionService
     public async Task<byte[]> DecryptAsync(byte[] encryptedData, string password)
     {
         // Validate the minimum size of the encrypted data
-        var minimumSize = CryptoConstants.SALTSIZE + CryptoConstants.IVSIZE + CryptoConstants.TAGSIZE;
+        var minimumSize = CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize;
 
         if (encryptedData.Length < minimumSize)
             throw new ArgumentException("Invalid encrypted data: input is too short!");
 
         // Extract the Salt
-        var extractedSalt = new byte[CryptoConstants.SALTSIZE];
-        Buffer.BlockCopy(encryptedData, _offset, extractedSalt, _offset, extractedSalt.Length);
+        var extractedSalt = new byte[CryptoConstants.SaltSize];
+        Buffer.BlockCopy(encryptedData, Offset, extractedSalt, Offset, extractedSalt.Length);
 
         // Extract the IV (nonce)
-        var extractedIV = new byte[CryptoConstants.IVSIZE];
-        Buffer.BlockCopy(encryptedData, extractedSalt.Length, extractedIV, _offset, extractedIV.Length);
+        var extractedIV = new byte[CryptoConstants.IvSize];
+        Buffer.BlockCopy(encryptedData, extractedSalt.Length, extractedIV, Offset, extractedIV.Length);
 
         // Extract the ciphertext
-        var ciphertextLength = encryptedData.Length - CryptoConstants.SALTSIZE - CryptoConstants.IVSIZE - CryptoConstants.TAGSIZE;
+        var ciphertextLength = encryptedData.Length - CryptoConstants.SaltSize - CryptoConstants.IvSize - CryptoConstants.TagSize;
         var extractedCiphertext = new byte[ciphertextLength];
-        Buffer.BlockCopy(encryptedData, extractedSalt.Length + extractedIV.Length, extractedCiphertext, _offset, ciphertextLength);
+        Buffer.BlockCopy(encryptedData, extractedSalt.Length + extractedIV.Length, extractedCiphertext, Offset, ciphertextLength);
 
         // Extract the Authentication Tag
-        var extractedAuthTag = new byte[CryptoConstants.TAGSIZE];
-        Buffer.BlockCopy(encryptedData, encryptedData.Length - extractedAuthTag.Length, extractedAuthTag, _offset, extractedAuthTag.Length);
+        var extractedAuthTag = new byte[CryptoConstants.TagSize];
+        Buffer.BlockCopy(encryptedData, encryptedData.Length - extractedAuthTag.Length, extractedAuthTag, Offset, extractedAuthTag.Length);
 
         // Derive the key
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSalt);
@@ -95,8 +95,9 @@ public class EncryptionService : IEncryptionService
         try
         {
             using (var aes = new AesGcm(key, extractedAuthTag.Length))
-
+            {
                 aes.Decrypt(extractedIV, extractedCiphertext, extractedAuthTag, plaintext);
+            }
         }
         catch (CryptographicException)
         {

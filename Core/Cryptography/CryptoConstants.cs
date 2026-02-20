@@ -4,17 +4,15 @@ namespace Artemis.Core.Cryptography;
 public static class CryptoConstants
 {
     #region AES-GCM Constants
-    public const int KEYSIZEBYTES = 32;
-    public const int SALTSIZE = 16;
-    public const int IVSIZE = 12;
-    public const int TAGSIZE = 16;
+    public const int KeySizeBytes = 32;
+    public const int SaltSize = 16;
+    public const int IvSize = 12;
+    public const int TagSize = 16;
     #endregion
 
     #region Argon2id Constants
-    public const int ITERATIONS = 3;
-    public const int MEMORYSIZE = 65536;
-    public const int PARALLELISM = 1;
+    public const int Iterations = 3;
+    public const int MemorySize = 65536;
+    public const int Parallelism = 1;
     #endregion
-
-
 }

@@ -1,7 +1,7 @@
 using System.Text;
 using Artemis.Core.Interfaces;
-using Artemis.Core.Cryptography;
 using Konscious.Security.Cryptography;
+using System.Security.Cryptography;
 
 namespace Artemis.Core.Cryptography;
 
@@ -11,18 +11,24 @@ public class KeyDerivationService : IKeyDerivationService
     public async Task<byte[]> DeriveKeyAsync(string password, byte[] salt)
     {
         var passwordBytes = Encoding.UTF8.GetBytes(password);
-
-        return await Task.Run(() =>
+        try
         {
-            using var argon2 = new Argon2id(passwordBytes);
+            return await Task.Run(() =>
+            {
+                using var argon2 = new Argon2id(passwordBytes);
 
-            argon2.Salt = salt;
-            argon2.DegreeOfParallelism = CryptoConstants.PARALLELISM;
-            argon2.MemorySize = CryptoConstants.MEMORYSIZE;
-            argon2.Iterations = CryptoConstants.ITERATIONS;
+                argon2.Salt = salt;
+                argon2.DegreeOfParallelism = CryptoConstants.Parallelism;
+                argon2.MemorySize = CryptoConstants.MemorySize;
+                argon2.Iterations = CryptoConstants.Iterations;
 
-            return argon2.GetBytes(CryptoConstants.KEYSIZEBYTES);
-        });
+                return argon2.GetBytes(CryptoConstants.KeySizeBytes);
+            });
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(passwordBytes);
+        }
     }
     #endregion
 }

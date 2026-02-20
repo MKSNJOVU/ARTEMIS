@@ -1,5 +1,3 @@
-
-
 namespace Artemis.Core.Interfaces;
 
 public interface IEncryptionService
