@@ -102,7 +102,7 @@ public class EncryptionService : IEncryptionService
         catch (CryptographicException)
         {
 
-            throw new CryptographicException($"Decryption failed. Wrong password or corrupted/tampered data!");
+            throw new CryptographicException("Decryption failed. Wrong password or corrupted/tampered data!");
         }
         finally
         {

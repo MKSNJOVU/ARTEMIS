@@ -11,7 +11,7 @@ public static class CryptoConstants
 
     #region Argon2id Constants
     public const int Iterations = 3;
-    public const int MemorySize = 65536;
+    public const int MemorySize = 131072;
     public const int Parallelism = 1;
     #endregion
 }
