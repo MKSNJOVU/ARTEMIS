@@ -1,4 +1,3 @@
-
 namespace Artemis.Core.Cryptography;
 
 public static class CryptoConstants
