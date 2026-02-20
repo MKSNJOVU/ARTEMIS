@@ -36,15 +36,20 @@ public class EncryptionService : IEncryptionService
         var ciphertext = new byte[plaintext.Length];
         var authenticationTag = new byte[CryptoConstants.TAGSIZE];
 
-        using (var aes = new AesGcm(key, CryptoConstants.TAGSIZE))
+        try
         {
-            aes.Encrypt(randomIV, plaintext, ciphertext, authenticationTag);
+            using (var aes = new AesGcm(key, CryptoConstants.TAGSIZE))
+            {
+                aes.Encrypt(randomIV, plaintext, ciphertext, authenticationTag);
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
         }
 
 
         // Assemble the output
-
-
         var result = new byte[CryptoConstants.SALTSIZE + CryptoConstants.IVSIZE + ciphertext.Length + CryptoConstants.TAGSIZE];
 
         Buffer.BlockCopy(randomSalt, _offset, result, _offset, randomSalt.Length);
@@ -97,6 +102,10 @@ public class EncryptionService : IEncryptionService
         {
 
             throw new CryptographicException($"Decryption failed. Wrong password or corrupted/tampered data!");
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(key);
         }
 
         return plaintext;
