@@ -20,12 +20,13 @@ public class FilePickerService : IFilePickerService
         return files?.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 
-    public async Task<string?> SaveFileAsync(string title = "Save File")
+    public async Task<string?> SaveFileAsync(string title = "Save File", string suggestedFileName)
     {
         var topLevel = GetTopLevel();
         var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = title
+            Title = title,
+            SuggestedFileName = suggestedFileName
         });
         return file?.TryGetLocalPath();
     }
