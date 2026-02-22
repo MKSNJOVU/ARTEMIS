@@ -4,11 +4,13 @@ using CommunityToolkit.Mvvm.Input;
 using Artemis.Desktop.Services;
 using System.IO;
 using System.Threading.Tasks;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Artemis.Desktop.ViewModels;
 
 
-public partial class EncryptViewModel : ViewModelBase
+public partial class EncryptionViewModel : ViewModelBase
 {
     #region Private Fields
     private readonly IEncryptionService _encryptionService;
@@ -16,7 +18,7 @@ public partial class EncryptViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
 
     [ObservableProperty]
-    private string? _selectedFilePath;
+    private List<string>? _selectedFilePath;
     [ObservableProperty]
     private string? _selectedFileName;
     [ObservableProperty]
@@ -38,7 +40,7 @@ public partial class EncryptViewModel : ViewModelBase
     #endregion
 
     #region Constructor
-    public EncryptViewModel(IEncryptionService encryptionService, IFilePickerService filePickerService, IDialogService dialogService)
+    public EncryptionViewModel(IEncryptionService encryptionService, IFilePickerService filePickerService, IDialogService dialogService)
     {
         _encryptionService = encryptionService;
         _filePickerService = filePickerService;
@@ -60,15 +62,15 @@ public partial class EncryptViewModel : ViewModelBase
         StatusMessage = null;
 
         // Getting the file path
-        var path = await _filePickerService.OpenFileAsync("Select file to encrypt");
+        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to encrypt");
 
         // Safe return for canceled operation or empty path
-        if (string.IsNullOrWhiteSpace(path))
+        if (path is null || path.Count == 0)
             return;
 
         // Storing the file details
-        SelectedFilePath = path;
-        SelectedFileName = Path.GetFileName(path);
+        SelectedFilePath = [.. path];
+        SelectedFileName = Path.GetFileName(path[0]);
     }
 
 
@@ -80,7 +82,7 @@ public partial class EncryptViewModel : ViewModelBase
     private async Task Encrypt()
     {
         // If guarding null or errant inputs
-        if (string.IsNullOrWhiteSpace(SelectedFilePath))
+        if (SelectedFilePath is null)
         {
             ErrorMessage = "No file selected!";
             return;
@@ -99,22 +101,25 @@ public partial class EncryptViewModel : ViewModelBase
         ErrorMessage = null;
         PasswordError = null;
 
+        // Assigning a local Password variable
+        string encryptingPassword = Password; // Prevents another threading from nulling out the property
+
         // Encryption Process
         IsEncrypting = true;
         try
         {
             StatusMessage = "Reading file...";
             ProgressValue = 10;
-            byte[] fileBytes = await File.ReadAllBytesAsync(SelectedFilePath!);
+            byte[] fileBytes = await File.ReadAllBytesAsync(SelectedFilePath[0]!);
 
             StatusMessage = "Deriving encryption key...";
             ProgressValue = 15;
-            var encryptedBytes = await _encryptionService.EncryptAsync(fileBytes, Password);
+            var encryptedBytes = await _encryptionService.EncryptAsync(fileBytes, encryptingPassword);
 
             ProgressValue = 80;
             StatusMessage = "Saving encrypted file...";
             var encryptedFile = GenerateOutput(SelectedFileName);
-            var savePath = await _filePickerService.SaveFileAsync("Save your file", encryptedFile);
+            var savePath = await _filePickerService.SaveFileAsync(encryptedFile, "Save your file");
 
             if (string.IsNullOrWhiteSpace(savePath))
             {
@@ -165,7 +170,7 @@ public partial class EncryptViewModel : ViewModelBase
     #endregion
 
     #region Helper Methods
-    private string GenerateOutput(string? file)
+    private static string GenerateOutput(string? file)
     {
         return $"{file}.enc";
     }
