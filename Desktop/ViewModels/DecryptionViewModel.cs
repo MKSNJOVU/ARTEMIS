@@ -4,9 +4,9 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Artemis.Core.Interfaces;
 using Artemis.Desktop.Services;
-using Artemis.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using FileTypeChecker;
 
 namespace Artemis.Desktop.ViewModels;
 
@@ -109,18 +109,25 @@ public partial class DecryptionViewModel : ViewModelBase
 
             string? decryptedFileName = Path.GetFileNameWithoutExtension(SelectedFileName);
             bool isSaveFile = await _dialogService.ShowConfirmationAsync("Save file to locaation?");
-            var savePath = await _filePickerService.SaveFileAsync(decryptedFileName!, "Save your file");
-            if (!isSaveFile)
+
+            // Writing a file to its original type
+            using (var stream = File.OpenRead(decryptedFileName!))
             {
-                StatusMessage = "Decryption process cancelled.";
-                ProgressValue = 0;
-                return;
-            }
-            else
-            {
-                await File.WriteAllBytesAsync(savePath!, decryptedBytes);
-                StatusMessage = "Decryption complete!";
-                ProgressValue = 100;
+                var fileType = FileTypeValidator.GetFileType(stream);
+                string extension = fileType.Extension; // e.g., ".docx", ".jpeg"
+                var savePath = await _filePickerService.SaveFileAsync($"{decryptedFileName!}.{extension}", "Save your file");
+                if (!isSaveFile)
+                {
+                    StatusMessage = "Decryption process cancelled.";
+                    ProgressValue = 0;
+                    return;
+                }
+                else
+                {
+                    await File.WriteAllBytesAsync(savePath!, decryptedBytes);
+                    StatusMessage = "Decryption complete!";
+                    ProgressValue = 100;
+                }
             }
 
         }
