@@ -76,7 +76,19 @@ public partial class DecryptionViewModel : ViewModelBase
             ErrorMessage = $"Cannot Decrypt {SelectedFileName} because it is the wrong file type.";
             return;
         }
-        _selectedFileBytes = await File.ReadAllBytesAsync(SelectedFilePath);
+        try
+        {
+            _selectedFileBytes = await File.ReadAllBytesAsync(SelectedFilePath);
+        }
+        catch
+        {
+            // Clear selection state on failure and surface a user-friendly error
+            _selectedFileBytes = null;
+            SelectedFilePath = null;
+            SelectedFileName = null;
+            StatusMessage = null;
+            ErrorMessage = "Unable to read the selected file. It may have been moved, deleted, or is in use.";
+        }
     }
 
     /// <summary>
