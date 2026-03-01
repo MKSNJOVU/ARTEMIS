@@ -12,7 +12,7 @@ namespace Artemis.Desktop.ViewModels;
 
 public partial class DecryptionViewModel : ViewModelBase
 {
-    #region Private Fileds
+    #region Private Fields
 
     private readonly IEncryptionService _encryptionService;
     private readonly IFilePickerService _filePickerService;
