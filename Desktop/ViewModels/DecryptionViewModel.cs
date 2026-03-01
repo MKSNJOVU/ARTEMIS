@@ -134,7 +134,6 @@ public partial class DecryptionViewModel : ViewModelBase
         catch (CryptographicException)
         {
             ErrorMessage = "Decryption failed. Wrong password or corrupted file.";
-            throw;
         }
         finally
         {
