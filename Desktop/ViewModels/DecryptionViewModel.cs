@@ -28,8 +28,6 @@ public partial class DecryptionViewModel : ViewModelBase
     [ObservableProperty]
     private string? _password;
     [ObservableProperty]
-    private string? _passwordError;
-    [ObservableProperty]
     private string? _errorMessage;
     [ObservableProperty]
     private string? _statusMessage;
@@ -78,7 +76,13 @@ public partial class DecryptionViewModel : ViewModelBase
             ErrorMessage = $"Cannot Decrypt {SelectedFileName} because it is the wrong file type.";
             return;
         }
+        _selectedFileBytes = await File.ReadAllBytesAsync(SelectedFilePath);
     }
+
+    /// <summary>
+    /// Decrypt a selected file to its original type.
+    /// </summary>
+    /// <returns></returns>
     [RelayCommand]
     private async Task Decrypt()
     {
@@ -146,8 +150,6 @@ public partial class DecryptionViewModel : ViewModelBase
             IsDecrypting = false;
         }
     }
-
-}
 
     #endregion
 }
