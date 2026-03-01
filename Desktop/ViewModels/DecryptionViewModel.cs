@@ -147,6 +147,17 @@ public partial class DecryptionViewModel : ViewModelBase
                     return;
                 }
 
+                if (File.Exists(savePath))
+                {
+                    var overwrite = await _dialogService.ShowConfirmationAsync(
+                        $"The file '{Path.GetFileName(savePath)}' already exists. Overwrite it?");
+                    if (!overwrite)
+                    {
+                        StatusMessage = "Decryption process cancelled.";
+                        ProgressValue = 0;
+                        return;
+                    }
+                }
                 await File.WriteAllBytesAsync(savePath, decryptedBytes);
                 StatusMessage = "Decryption complete!";
                 ProgressValue = 100;
