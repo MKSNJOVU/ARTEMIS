@@ -71,7 +71,7 @@ public partial class DecryptionViewModel : ViewModelBase
         SelectedFilePath = path[0];
         SelectedFileName = Path.GetFileName(path[0]);
 
-        if (Path.GetExtension(SelectedFileName) != ".enc")
+        if (!Path.GetExtension(SelectedFileName).Equals(".enc", StringComparison.OrdinalIgnoreCase))
         {
             ErrorMessage = $"Cannot Decrypt {SelectedFileName} because it is the wrong file type.";
             return;
