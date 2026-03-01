@@ -110,8 +110,8 @@ public partial class DecryptionViewModel : ViewModelBase
             string? decryptedFileName = Path.GetFileNameWithoutExtension(SelectedFileName);
             bool isSaveFile = await _dialogService.ShowConfirmationAsync("Save file to locaation?");
 
-            // Writing a file to its original type
-            using (var stream = File.OpenRead(decryptedFileName!))
+            // Determine file type from the in-memory decrypted bytes, then save to chosen location
+            using (var stream = new MemoryStream(decryptedBytes))
             {
                 var fileType = FileTypeValidator.GetFileType(stream);
                 string extension = fileType.Extension; // e.g., ".docx", ".jpeg"
