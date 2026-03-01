@@ -63,7 +63,7 @@ public partial class DecryptionViewModel : ViewModelBase
         StatusMessage = null;
 
         // Getting the file path
-        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to encrypt");
+        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to decrypt");
 
         // Safe return for canceled operation or empty path
         if (path is null || path.Count == 0)
