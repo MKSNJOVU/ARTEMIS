@@ -108,26 +108,32 @@ public partial class DecryptionViewModel : ViewModelBase
             StatusMessage = "Saving decrypted file...";
 
             string? decryptedFileName = Path.GetFileNameWithoutExtension(SelectedFileName);
-            bool isSaveFile = await _dialogService.ShowConfirmationAsync("Save file to locaation?");
+            bool isSaveFile = await _dialogService.ShowConfirmationAsync("Save file to location?");
+            if (!isSaveFile)
+            {
+                StatusMessage = "Decryption process cancelled.";
+                ProgressValue = 0;
+                return;
+            }
 
-            // Determine file type from the in-memory decrypted bytes, then save to chosen location
+            // Writing a file to its original type
             using (var stream = new MemoryStream(decryptedBytes))
             {
                 var fileType = FileTypeValidator.GetFileType(stream);
                 string extension = fileType.Extension; // e.g., ".docx", ".jpeg"
-                var savePath = await _filePickerService.SaveFileAsync($"{decryptedFileName!}.{extension}", "Save your file");
-                if (!isSaveFile)
+                var suggestedFileName = $"{decryptedFileName}{extension}";
+                var savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save your file");
+
+                if (string.IsNullOrWhiteSpace(savePath))
                 {
                     StatusMessage = "Decryption process cancelled.";
                     ProgressValue = 0;
                     return;
                 }
-                else
-                {
-                    await File.WriteAllBytesAsync(savePath!, decryptedBytes);
-                    StatusMessage = "Decryption complete!";
-                    ProgressValue = 100;
-                }
+
+                await File.WriteAllBytesAsync(savePath, decryptedBytes);
+                StatusMessage = "Decryption complete!";
+                ProgressValue = 100;
             }
 
         }
