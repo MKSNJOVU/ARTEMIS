@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
@@ -67,6 +68,11 @@ public partial class DecryptionViewModel : ViewModelBase
         if (path is null || path.Count == 0)
             return;
 
+        // Clearing previous selections
+        _selectedFileBytes = null;
+        SelectedFilePath = null;
+        SelectedFileName = null;
+
         // Storing the file details
         SelectedFilePath = path[0];
         SelectedFileName = Path.GetFileName(path[0]);
@@ -74,6 +80,9 @@ public partial class DecryptionViewModel : ViewModelBase
         if (!Path.GetExtension(SelectedFileName).Equals(".enc", StringComparison.OrdinalIgnoreCase))
         {
             ErrorMessage = $"Cannot Decrypt {SelectedFileName} because it is the wrong file type.";
+
+            SelectedFilePath = null;
+            SelectedFileName = null;
             return;
         }
         try
@@ -114,12 +123,16 @@ public partial class DecryptionViewModel : ViewModelBase
 
         IsDecrypting = true;
 
+        // Assigning a local Password variable
+        string decryptingPassword = Password;
+        char[] passwordChars = decryptingPassword.ToCharArray(); ; // Prevents another threading from nulling out the property
+
         try
         {
             StatusMessage = "Deriving decryption key...";
             ProgressValue = 15;
 
-            var decryptedBytes = await _encryptionService.DecryptAsync(_selectedFileBytes, Password);
+            var decryptedBytes = await _encryptionService.DecryptAsync(_selectedFileBytes, passwordChars);
             ProgressValue = 80;
             StatusMessage = "Saving decrypted file...";
 
@@ -159,6 +172,7 @@ public partial class DecryptionViewModel : ViewModelBase
                     }
                 }
                 await File.WriteAllBytesAsync(savePath, decryptedBytes);
+                decryptingPassword = null;
                 StatusMessage = "Decryption complete!";
                 ProgressValue = 100;
             }
@@ -167,9 +181,26 @@ public partial class DecryptionViewModel : ViewModelBase
         catch (CryptographicException)
         {
             ErrorMessage = "Decryption failed. Wrong password or corrupted file.";
+            return;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            ErrorMessage = "You do not have permissions to open this file.";
+            return;
+        }
+        catch (IOException) // Handling the case of an opened file
+        {
+            ErrorMessage = "File is in use by another program. Please close it and try again.";
+            return;
+        }
+        catch (Exception e)
+        {
+            ErrorMessage = e.Message;
+            return;
         }
         finally
         {
+            Array.Clear(passwordChars, 0, passwordChars.Length);
             IsDecrypting = false;
         }
     }

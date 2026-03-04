@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
+using System;
 
 namespace Artemis.Desktop.ViewModels;
 
@@ -103,7 +104,7 @@ public partial class EncryptionViewModel : ViewModelBase
 
         // Assigning a local Password variable
         string encryptingPassword = Password; // Prevents another threading from nulling out the property
-
+        char[] passwordChars = encryptingPassword.ToCharArray();
         // Encryption Process
         IsEncrypting = true;
         try
@@ -114,7 +115,7 @@ public partial class EncryptionViewModel : ViewModelBase
 
             StatusMessage = "Deriving encryption key...";
             ProgressValue = 15;
-            var encryptedBytes = await _encryptionService.EncryptAsync(fileBytes, encryptingPassword);
+            var encryptedBytes = await _encryptionService.EncryptAsync(fileBytes, passwordChars);
 
             ProgressValue = 80;
             StatusMessage = "Saving encrypted file...";
@@ -164,6 +165,7 @@ public partial class EncryptionViewModel : ViewModelBase
         }
         finally
         {
+            Array.Clear(passwordChars, 0, passwordChars.Length);
             IsEncrypting = false;
         }
     }
