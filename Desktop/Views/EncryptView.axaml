@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Artemis.Desktop.ViewModels"
+             x:Class="Artemis.Desktop.Views.EncryptView"
+             x:DataType="vm:EncryptViewModel">
+
+    <StackPanel Margin="20" Spacing="15">
+
+        <TextBlock Text="Encrypt a File"
+                   FontSize="24" FontWeight="Bold" />
+
+        <!-- TODO: Security notice -->
+
+        <!-- TODO: File selection: Button + filename display -->
+
+        <!-- TODO: Password input -->
+
+        <!-- TODO: Password confirm input -->
+
+        <!-- TODO: Password error text -->
+
+        <!-- TODO: Progress bar + status (visible when ShowProgress) -->
+
+        <!-- TODO: Error message (visible when ErrorMessage not empty) -->
+
+        <!-- TODO: Encrypt button -->
+
+    </StackPanel>
+</UserControl>
