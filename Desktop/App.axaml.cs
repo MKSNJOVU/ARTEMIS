@@ -26,7 +26,8 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
         ConfigureServices(services);
-        Services = services.BuildServiceProvider();
+        var serviceProvider = services.BuildServiceProvider();
+        Services = serviceProvider;
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -35,6 +36,7 @@ public partial class App : Application
             {
                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
             };
+            desktop.Exit += (_, _) => serviceProvider.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();
