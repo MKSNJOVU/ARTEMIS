@@ -1,29 +1,70 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Artemis.Desktop.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
              x:Class="Artemis.Desktop.Views.EncryptView"
-             x:DataType="vm:EncryptViewModel">
+             x:DataType="vm:EncryptionViewModel">
 
+    <!-- 2. Layout -->
     <StackPanel Margin="20" Spacing="15">
 
         <TextBlock Text="Encrypt a File"
                    FontSize="24" FontWeight="Bold" />
 
-        <!-- TODO: Security notice -->
+        <!-- 3. Security notice -->
+        <Border Background="#1E3A5F" CornerRadius="4" Padding="12">
+            <TextBlock Text="Your password never leaves this device. All encryption is performed locally."
+                       Foreground="White"
+                       TextWrapping="Wrap" />
+        </Border>
 
-        <!-- TODO: File selection: Button + filename display -->
+        <!-- 4. File selection -->
+        <StackPanel Spacing="8">
+            <Button Content="Select File"
+                    Command="{Binding SelectFileCommand}" />
+            <TextBlock Text="{Binding SelectedFileName}"
+                       Watermark="No File selected"
+                       TextWrapping="Wrap" />
+        </StackPanel>
 
-        <!-- TODO: Password input -->
+        <!-- 5. Password inputs -->
+        <StackPanel Spacing="8">
+            <TextBlock Text="Password" />
+            <TextBox PasswordChar="*"
+                     RevealPasswordButtonVisible="True"
+                     Text="{Binding Password}"
+                     Watermark="Enter password" />
 
-        <!-- TODO: Password confirm input -->
+            <TextBlock Text="Confirm Password" />
+            <TextBox PasswordChar="*"
+                     RevealPasswordButtonVisible="True"
+                     Text="{Binding PasswordConfirm}"
+                     Watermark="Confirm password" />
 
-        <!-- TODO: Password error text -->
+            <!-- Password error -->
+            <TextBlock Text="{Binding PasswordError}"
+                       Foreground="Red"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding PasswordError, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
 
-        <!-- TODO: Progress bar + status (visible when ShowProgress) -->
+        <!-- 6. Progress section -->
+        <StackPanel Spacing="6" IsVisible="{Binding ShowProgress}">
+            <ProgressBar Minimum="0" Maximum="100"
+                         Value="{Binding ProgressValue}" />
+            <TextBlock Text="{Binding StatusMessage}" />
+        </StackPanel>
 
-        <!-- TODO: Error message (visible when ErrorMessage not empty) -->
+        <!-- 7. Error display -->
+        <TextBlock Text="{Binding ErrorMessage}"
+                   Foreground="Red"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
-        <!-- TODO: Encrypt button -->
+        <!-- 8. Encrypt button -->
+        <Button Content="Encrypt"
+                Command="{Binding EncryptCommand}"
+                IsEnabled="{Binding !IsEncrypting}" />
 
     </StackPanel>
 </UserControl>
