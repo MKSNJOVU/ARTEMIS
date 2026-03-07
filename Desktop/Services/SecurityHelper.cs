@@ -20,9 +20,15 @@ public static class SecurityHelper
         {
             if (sender is TextBox textBox)
             {
+                // Clear any previously stored password buffer to minimize secret lifetime
+                var oldBuffer = GetSecurePassword(textBox);
+                if (oldBuffer != null)
+                    Array.Clear(oldBuffer, 0, oldBuffer.Length);
+
                 var text = textBox.Text;
                 // Convert string to char[] and update the bound property
-                SetSecurePassword(textBox, string.IsNullOrEmpty(text) ? null : text.ToCharArray());
+                var newBuffer = string.IsNullOrEmpty(text) ? null : text.ToCharArray();
+                SetSecurePassword(textBox, newBuffer);
             }
         });
     }
