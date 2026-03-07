@@ -5,9 +5,9 @@ using System;
 namespace Artemis.Desktop.Services;
 
 /// <summary>
-/// Provides attached properties for secure password handling in Avalonia.
-/// This minimizes the lifespan of password strings by converting them to char arrays immediately.
-/// </summary>
+/// Provides an attached property that exposes a <see cref="TextBox"/>'s password as a <see cref="char"/> array.
+/// This avoids storing the password as a <see cref="string"/> in the view model or other bound data, but the password
+/// still resides in <see cref="TextBox.Text"/> as a <see cref="string"/> managed by the UI framework.
 public static class SecurityHelper
 {
     public static readonly AttachedProperty<char[]?> SecurePasswordProperty =
