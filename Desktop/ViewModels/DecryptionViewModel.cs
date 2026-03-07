@@ -14,7 +14,6 @@ namespace Artemis.Desktop.ViewModels;
 public partial class DecryptionViewModel : ViewModelBase
 {
     #region Private Fields
-
     private readonly IEncryptionService _encryptionService;
     private readonly IFilePickerService _filePickerService;
     private readonly IDialogService _dialogService;
@@ -26,8 +25,10 @@ public partial class DecryptionViewModel : ViewModelBase
     private string? _selectedFilePath;
     [ObservableProperty]
     private string? _selectedFileName;
+    
     [ObservableProperty]
-    private string? _password;
+    private char[]? _passwordBuffer;
+    
     [ObservableProperty]
     private string? _errorMessage;
     [ObservableProperty]
@@ -50,37 +51,27 @@ public partial class DecryptionViewModel : ViewModelBase
     #endregion
 
     #region Commands
-    /// <summary>
-    /// Command to allow users to select a file
-    /// </summary>
-    /// <returns>The file name, file path and file bytes of a selected file.</returns>
     [RelayCommand]
     private async Task SelectFile()
     {
-        // Clearing previous errors
         ErrorMessage = null;
         StatusMessage = null;
 
-        // Getting the file path
         IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to decrypt");
 
-        // Safe return for canceled operation or empty path
         if (path is null || path.Count == 0)
             return;
 
-        // Clearing previous selections
         _selectedFileBytes = null;
         SelectedFilePath = null;
         SelectedFileName = null;
 
-        // Storing the file details
         SelectedFilePath = path[0];
         SelectedFileName = Path.GetFileName(path[0]);
 
         if (!Path.GetExtension(SelectedFileName).Equals(".enc", StringComparison.OrdinalIgnoreCase))
         {
             ErrorMessage = $"Cannot Decrypt {SelectedFileName} because it is the wrong file type.";
-
             SelectedFilePath = null;
             SelectedFileName = null;
             return;
@@ -91,48 +82,36 @@ public partial class DecryptionViewModel : ViewModelBase
         }
         catch
         {
-            // Clear selection state on failure and surface a user-friendly error
             _selectedFileBytes = null;
             SelectedFilePath = null;
             SelectedFileName = null;
-            StatusMessage = null;
             ErrorMessage = "Unable to read the selected file. It may have been moved, deleted, or is in use.";
         }
     }
 
-    /// <summary>
-    /// Decrypt a selected file to its original type.
-    /// </summary>
-    /// <returns></returns>
     [RelayCommand]
     private async Task Decrypt()
     {
-        // If guarding null or errant inputs
         if (_selectedFileBytes is null)
         {
             ErrorMessage = "No file selected!";
             return;
         }
-        if (string.IsNullOrWhiteSpace(Password))
+        if (PasswordBuffer is null || PasswordBuffer.Length == 0)
         {
             ErrorMessage = "Password cannot be empty!";
             return;
         }
-        // Clear previous errors
+        
         ErrorMessage = null;
-
         IsDecrypting = true;
-
-        // Assigning a local Password variable
-        string decryptingPassword = Password;
-        char[] passwordChars = decryptingPassword.ToCharArray(); ; // Prevents another threading from nulling out the property
 
         try
         {
             StatusMessage = "Deriving decryption key...";
             ProgressValue = 15;
 
-            var decryptedBytes = await _encryptionService.DecryptAsync(_selectedFileBytes, passwordChars);
+            var decryptedBytes = await _encryptionService.DecryptAsync(_selectedFileBytes, PasswordBuffer);
             ProgressValue = 80;
             StatusMessage = "Saving decrypted file...";
 
@@ -145,11 +124,10 @@ public partial class DecryptionViewModel : ViewModelBase
                 return;
             }
 
-            // Writing a file to its original type
             using (var stream = new MemoryStream(decryptedBytes))
             {
                 var fileType = FileTypeValidator.GetFileType(stream);
-                string extension = fileType.Extension; // e.g., ".docx", ".jpeg"
+                string extension = fileType.Extension;
                 var suggestedFileName = $"{decryptedFileName}{extension}";
                 var savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save your file");
 
@@ -172,7 +150,6 @@ public partial class DecryptionViewModel : ViewModelBase
                     }
                 }
                 await File.WriteAllBytesAsync(savePath, decryptedBytes);
-                decryptingPassword = null;
                 StatusMessage = "Decryption complete!";
                 ProgressValue = 100;
             }
@@ -181,29 +158,24 @@ public partial class DecryptionViewModel : ViewModelBase
         catch (CryptographicException)
         {
             ErrorMessage = "Decryption failed. Wrong password or corrupted file.";
-            return;
         }
         catch (UnauthorizedAccessException)
         {
             ErrorMessage = "You do not have permissions to open this file.";
-            return;
         }
-        catch (IOException) // Handling the case of an opened file
+        catch (IOException)
         {
             ErrorMessage = "File is in use by another program. Please close it and try again.";
-            return;
         }
         catch (Exception e)
         {
             ErrorMessage = e.Message;
-            return;
         }
         finally
         {
-            Array.Clear(passwordChars, 0, passwordChars.Length);
+            if (PasswordBuffer is not null) Array.Clear(PasswordBuffer, 0, PasswordBuffer.Length);
             IsDecrypting = false;
         }
     }
-
     #endregion
 }

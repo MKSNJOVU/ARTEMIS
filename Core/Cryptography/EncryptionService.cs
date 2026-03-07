@@ -20,7 +20,7 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task<byte[]> EncryptAsync(byte[] plaintext, string password)
+    public async Task<byte[]> EncryptAsync(byte[] plaintext, char[] password)
     {
         // Generate the randomSalt
         var randomSalt = new byte[CryptoConstants.SaltSize];
@@ -61,7 +61,7 @@ public class EncryptionService : IEncryptionService
         return result;
     }
 
-    public async Task<byte[]> DecryptAsync(byte[] encryptedData, string password)
+    public async Task<byte[]> DecryptAsync(byte[] encryptedData, char[] password)
     {
         // Validate the minimum size of the encrypted data
         var minimumSize = CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize;

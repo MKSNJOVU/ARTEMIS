@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace Artemis.Desktop.Views;
 
-public partial class EncryptView : UserControl
+public partial class DecryptionView : UserControl
 {
-    public EncryptView()
+    public DecryptionView()
     {
         InitializeComponent();
     }

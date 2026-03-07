@@ -2,69 +2,55 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Artemis.Desktop.ViewModels"
              xmlns:conv="using:Avalonia.Data.Converters"
-             x:Class="Artemis.Desktop.Views.EncryptView"
-             x:DataType="vm:EncryptionViewModel">
+             xmlns:services="using:Artemis.Desktop.Services"
+             x:Class="Artemis.Desktop.Views.DecryptionView"
+             x:DataType="vm:DecryptionViewModel">
 
-    <!-- 2. Layout -->
     <StackPanel Margin="20" Spacing="15">
 
-        <TextBlock Text="Encrypt a File"
+        <TextBlock Text="Decrypt a File"
                    FontSize="24" FontWeight="Bold" />
 
-        <!-- 3. Security notice -->
+        <!-- Security notice -->
         <Border Background="#1E3A5F" CornerRadius="4" Padding="12">
-            <TextBlock Text="Your password never leaves this device. All encryption is performed locally."
+            <TextBlock Text="Your password never leaves this device. All decryption is performed locally."
                        Foreground="White"
                        TextWrapping="Wrap" />
         </Border>
 
-        <!-- 4. File selection -->
+        <!-- File selection -->
         <StackPanel Spacing="8">
             <Button Content="Select File"
                     Command="{Binding SelectFileCommand}" />
-            <TextBlock Text="{Binding SelectedFileName}"
-                       Watermark="No File selected"
+            <TextBlock Text="{Binding SelectedFileName, TargetNullValue='No file selected'}"
                        TextWrapping="Wrap" />
         </StackPanel>
 
-        <!-- 5. Password inputs -->
+        <!-- Password input -->
         <StackPanel Spacing="8">
             <TextBlock Text="Password" />
             <TextBox PasswordChar="*"
-                     RevealPasswordButtonVisible="True"
-                     Text="{Binding Password}"
+                     services:SecurityHelper.SecurePassword="{Binding PasswordBuffer, Mode=TwoWay}"
                      Watermark="Enter password" />
-
-            <TextBlock Text="Confirm Password" />
-            <TextBox PasswordChar="*"
-                     RevealPasswordButtonVisible="True"
-                     Text="{Binding PasswordConfirm}"
-                     Watermark="Confirm password" />
-
-            <!-- Password error -->
-            <TextBlock Text="{Binding PasswordError}"
-                       Foreground="Red"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding PasswordError, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
 
-        <!-- 6. Progress section -->
+        <!-- Progress section -->
         <StackPanel Spacing="6" IsVisible="{Binding ShowProgress}">
             <ProgressBar Minimum="0" Maximum="100"
                          Value="{Binding ProgressValue}" />
             <TextBlock Text="{Binding StatusMessage}" />
         </StackPanel>
 
-        <!-- 7. Error display -->
+        <!-- Error display -->
         <TextBlock Text="{Binding ErrorMessage}"
                    Foreground="Red"
                    TextWrapping="Wrap"
                    IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
 
-        <!-- 8. Encrypt button -->
-        <Button Content="Encrypt"
-                Command="{Binding EncryptCommand}"
-                IsEnabled="{Binding !IsEncrypting}" />
+        <!-- Decrypt button -->
+        <Button Content="Decrypt"
+                Command="{Binding DecryptCommand}"
+                IsEnabled="{Binding !IsDecrypting}" />
 
     </StackPanel>
 </UserControl>

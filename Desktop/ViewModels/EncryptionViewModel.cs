@@ -23,9 +23,9 @@ public partial class EncryptionViewModel : ViewModelBase
     [ObservableProperty]
     private string? _selectedFileName;
     [ObservableProperty]
-    private string? _password;
+    private char[]? _passwordBuffer;
     [ObservableProperty]
-    private string? _passwordConfirm;
+    private char[]? _passwordConfirmBuffer;
     [ObservableProperty]
     private string? _passwordError;
     [ObservableProperty]
@@ -88,12 +88,12 @@ public partial class EncryptionViewModel : ViewModelBase
             ErrorMessage = "No file selected!";
             return;
         }
-        if (string.IsNullOrWhiteSpace(Password))
+        if (PasswordBuffer is null || PasswordBuffer.Length == 0)
         {
             PasswordError = "Password cannot be empty!";
             return;
         }
-        if (Password != PasswordConfirm)
+        if (!PasswordBuffer.SequenceEqual(PasswordConfirmBuffer ?? []))
         {
             PasswordError = "Passwords do not match!";
             return;
@@ -102,16 +102,15 @@ public partial class EncryptionViewModel : ViewModelBase
         ErrorMessage = null;
         PasswordError = null;
 
-        // Assigning a local Password variable
-        string encryptingPassword = Password; // Prevents another threading from nulling out the property
-        char[] passwordChars = encryptingPassword.ToCharArray();
+        // Assigning a local Password variable - prevents another thread from nulling out the property
+        char[] passwordChars = (char[])PasswordBuffer.Clone();
         // Encryption Process
         IsEncrypting = true;
         try
         {
             StatusMessage = "Reading file...";
             ProgressValue = 10;
-            byte[] fileBytes = await File.ReadAllBytesAsync(SelectedFilePath[0]!);
+            byte[] fileBytes = await File.ReadAllBytesAsync(SelectedFilePath[0]);
 
             StatusMessage = "Deriving encryption key...";
             ProgressValue = 15;
