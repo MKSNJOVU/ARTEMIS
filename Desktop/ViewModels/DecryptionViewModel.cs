@@ -5,13 +5,12 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Artemis.Core.Interfaces;
 using Artemis.Desktop.Services;
+using Artemis.Desktop.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FileTypeChecker;
 
 namespace Artemis.Desktop.ViewModels;
-
-public enum OperationState { Idle, Processing, Saving, Completed, Faulted }
 
 public partial class DecryptionViewModel : ViewModelBase
 {
@@ -42,12 +41,12 @@ public partial class DecryptionViewModel : ViewModelBase
     private string? _statusMessage;
     [ObservableProperty]
     private double _progressValue;
-    
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
     [NotifyCanExecuteChangedFor(nameof(SelectFileCommand))]
     private bool _isDecrypting;
-    
+
     [ObservableProperty]
     private bool _showProgress;
 
@@ -212,7 +211,7 @@ public partial class DecryptionViewModel : ViewModelBase
             if (decryptedBytes is not null) Array.Clear(decryptedBytes, 0, decryptedBytes.Length);
             if (SelectedFileBytes is not null) Array.Clear(SelectedFileBytes, 0, SelectedFileBytes.Length);
             if (PasswordBuffer is not null) Array.Clear(PasswordBuffer, 0, PasswordBuffer.Length);
-            
+
             IsDecrypting = false;
             SelectedFileBytes = null;
         }
