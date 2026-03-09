@@ -10,6 +10,7 @@ using Artemis.Core.Cryptography;
 using Artemis.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using Artemis.Desktop.Services.Interfaces;
 
 namespace Artemis.Desktop;
 
