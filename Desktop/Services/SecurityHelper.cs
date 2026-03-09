@@ -15,21 +15,22 @@ public static class SecurityHelper
 
     static SecurityHelper()
     {
-        // Listen for when the Text property of any TextBox changes
-        TextBox.TextProperty.Changed.AddClassHandler<TextBox>((sender, e) =>
+        // Only handle Text changes for TextBoxes that have SecurePasswordProperty bound/set,
+        // avoiding unnecessary char[] allocations and writes on unrelated text boxes.
+        TextBox.TextProperty.Changed.AddClassHandler<TextBox>((textBox, e) =>
         {
-            if (sender is TextBox textBox)
-            {
-                // Clear any previously stored password buffer to minimize secret lifetime
-                var oldBuffer = GetSecurePassword(textBox);
-                if (oldBuffer != null)
-                    Array.Clear(oldBuffer, 0, oldBuffer.Length);
+            if (!textBox.IsSet(SecurePasswordProperty))
+                return;
 
-                var text = textBox.Text;
-                // Convert string to char[] and update the bound property
-                var newBuffer = string.IsNullOrEmpty(text) ? null : text.ToCharArray();
-                SetSecurePassword(textBox, newBuffer);
-            }
+            // Clear any previously stored password buffer to minimize secret lifetime
+            var oldBuffer = GetSecurePassword(textBox);
+            if (oldBuffer != null)
+                Array.Clear(oldBuffer, 0, oldBuffer.Length);
+
+            var text = textBox.Text;
+            // Convert string to char[] and update the bound property
+            var newBuffer = string.IsNullOrEmpty(text) ? null : text.ToCharArray();
+            SetSecurePassword(textBox, newBuffer);
         });
     }
 
