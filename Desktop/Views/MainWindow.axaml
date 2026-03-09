@@ -12,14 +12,26 @@
         <DockPanel>
             <!-- Navigation Bar -->
             <Border DockPanel.Dock="Top" Background="#F3F3F3" Padding="10">
-                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                    <Button Content="Encrypt" 
-                            Command="{Binding ShowEncryptCommand}"
-                            Width="100" HorizontalContentAlignment="Center"/>
-                    <Button Content="Decrypt" 
-                            Command="{Binding ShowDecryptCommand}"
-                            Width="100" HorizontalContentAlignment="Center"/>
-                </StackPanel>
+                <Grid ColumnDefinitions="*, Auto, *">
+                    <!-- Navigation Buttons (Centered) -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                        <Button Content="Encrypt" 
+                                Command="{Binding ShowEncryptCommand}"
+                                Width="100" HorizontalContentAlignment="Center"/>
+                        <Button Content="Decrypt" 
+                                Command="{Binding ShowDecryptCommand}"
+                                Width="100" HorizontalContentAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Security Tool (Right-aligned) -->
+                    <Button Grid.Column="2" 
+                            Content="Wipe Clipboard" 
+                            Command="{Binding WipeClipboardCommand}"
+                            HorizontalAlignment="Right"
+                            Background="#FFE0E0" 
+                            Foreground="#D32F2F"
+                            ToolTip.Tip="Clear sensitive data from the system clipboard"/>
+                </Grid>
             </Border>
    
             <!-- Main Content Area -->

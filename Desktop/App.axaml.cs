@@ -36,13 +36,18 @@ public partial class App : Application
             {
                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
             };
+
+            desktop.Exit += async (_, _) =>
+            {
+                var clipboardService = Services.GetRequiredService<IClipboardService>();
+                await clipboardService.ClearClipboardAsync();
+            };
+
             desktop.Exit += (_, _) => serviceProvider.Dispose();
         }
 
-        base.OnFrameworkInitializationCompleted();
-    }
 
-    private static void ConfigureServices(IServiceCollection services)
+        private static void ConfigureServices(IServiceCollection services)
     {
         // Core
         services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
@@ -51,6 +56,9 @@ public partial class App : Application
         // Desktop services
         services.AddSingleton<IFilePickerService, FilePickerService>();
         services.AddSingleton<IDialogService, DialogService>();
+        services.AddSingleton<IClipboardService, ClipboardService>();
+
+
 
         // ViewModels
         services.AddTransient<EncryptionViewModel>();
