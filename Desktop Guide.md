@@ -1188,3 +1188,54 @@ When debugging interoperability issues, compare implementations across all platf
 | CommunityToolkit.Mvvm | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/ |
 | [ObservableProperty] | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty |
 | [RelayCommand] | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/relaycommand |
+
+---
+
+# Refactor: Memory Efficiency with Span and Stream
+
+## Why Refactor?
+
+The current implementation uses `File.ReadAllBytesAsync()`, which loads the entire file into a single `byte[]` in memory. While functional for small files, this has drawbacks for a professional desktop app:
+
+1.  **Memory Fragmentation:** Large files (>85KB) are allocated on the **Large Object Heap (LOH)**. Frequent allocations here lead to memory fragmentation and high Garbage Collector (GC) pressure.
+2.  **Scalability:** Attempting to encrypt a 1GB file would require 1GB of contiguous RAM, likely causing an `OutOfMemoryException`.
+3.  **UI Responsiveness:** Moving massive arrays across the heap can cause micro-stutters in the UI thread.
+
+## The Solution: Span and Stream
+
+### 1. Span<T> and ReadOnlySpan<T>
+`Span<byte>` is a stack-allocated view into memory. It allows for "slicing" (extracting salt, IV, and ciphertext) without creating copies.
+- **Benefit:** Zero-copy operations. We can point to the salt inside a buffer without allocating a new `byte[]`.
+- **Modern API:** .NET's `AesGcm` class natively accepts `ReadOnlySpan<byte>`, which is the most efficient way to interact with cryptographic primitives.
+
+### 2. Stream-Based Processing
+Instead of loading the file into memory, use `FileStream` to process data in chunks.
+- **Benefit:** Constant memory footprint. Whether the file is 10KB or 10GB, the application only uses a small, fixed buffer (e.g., 64KB).
+- **Async Efficiency:** Streams allow the OS to handle I/O while the CPU handles encryption in parallel.
+
+## Refactor Strategy
+
+### Step 1: Update IEncryptionService
+Change method signatures to support `Stream` or `ReadOnlySpan<byte>`.
+
+```csharp
+public interface IEncryptionService
+{
+    // Encrypts from a source stream to a destination stream
+    Task EncryptAsync(Stream source, Stream destination, char[] password);
+}
+```
+
+### Step 2: Zero-Copy Parsing
+Instead of `Buffer.BlockCopy`, use Span slicing for header extraction:
+
+```csharp
+// Modern approach (Zero Copy)
+ReadOnlySpan<byte> data = /* from buffer */;
+var salt = data.Slice(0, 16);
+var iv = data.Slice(16, 12);
+```
+
+### Step 3: ViewModel Updates
+Replace `File.ReadAllBytesAsync` with `File.OpenRead`. This ensures that even for massive files, the UI remains fluid and memory usage stays low.
+

@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Artemis.Desktop.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             xmlns:services="using:Artemis.Desktop.Services"
+             x:Class="Artemis.Desktop.Views.DecryptionView"
+             x:DataType="vm:DecryptionViewModel">
+
+    <StackPanel Margin="20" Spacing="15">
+
+        <TextBlock Text="Decrypt a File"
+                   FontSize="24" FontWeight="Bold" />
+
+        <!-- Security notice -->
+        <Border Background="#1E3A5F" CornerRadius="4" Padding="12">
+            <TextBlock Text="Your password never leaves this device. All decryption is performed locally."
+                       Foreground="White"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <!-- File selection -->
+        <StackPanel Spacing="8">
+            <Button Content="Select File"
+                    Command="{Binding SelectFileCommand}" />
+            <TextBlock Text="{Binding SelectedFileName, TargetNullValue='No file selected'}"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Password input -->
+        <StackPanel Spacing="8">
+            <TextBlock Text="Password" />
+            <TextBox PasswordChar="*"
+                     services:SecurityHelper.SecurePassword="{Binding PasswordBuffer, Mode=TwoWay}"
+                     Watermark="Enter password" />
+        </StackPanel>
+
+        <!-- Progress section -->
+        <StackPanel Spacing="6" IsVisible="{Binding ShowProgress}">
+            <ProgressBar Minimum="0" Maximum="100"
+                         Value="{Binding ProgressValue}" />
+            <TextBlock Text="{Binding StatusMessage}" />
+        </StackPanel>
+
+        <!-- Error display -->
+        <TextBlock Text="{Binding ErrorMessage}"
+                   Foreground="Red"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+
+        <!-- Decrypt button -->
+        <Button Content="Decrypt"
+                Command="{Binding DecryptCommand}"
+                IsEnabled="{Binding !IsDecrypting}" />
+
+    </StackPanel>
+</UserControl>

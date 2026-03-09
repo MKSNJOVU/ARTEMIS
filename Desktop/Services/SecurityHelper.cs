@@ -1,0 +1,68 @@
+using Avalonia;
+using Avalonia.Controls;
+using System;
+using System.Runtime.CompilerServices;
+
+namespace Artemis.Desktop.Services;
+
+/// <summary>
+/// Provides an attached property that exposes a <see cref="TextBox"/>'s password as a <see cref="char"/> array.
+/// This avoids storing the password as a <see cref="string"/> in the view model or other bound data, but the password
+/// still resides in <see cref="TextBox.Text"/> as a <see cref="string"/> managed by the UI framework.
+/// </summary>
+public static class SecurityHelper
+{
+    private static readonly ConditionalWeakTable<TextBox, IDisposable> _textSubscriptions = new();
+
+    public static readonly AttachedProperty<char[]?> SecurePasswordProperty =
+        AvaloniaProperty.RegisterAttached<TextBox, char[]?>("SecurePassword", typeof(SecurityHelper));
+
+    static SecurityHelper()
+    {
+        // EXCELLENCE: Instead of listening to EVERY TextBox globally, 
+        // we only react when our property is ATTACHED to a specific instance.
+        SecurePasswordProperty.Changed.AddClassHandler<TextBox>(HandleSecurePasswordChanged);
+    }
+
+    private static void HandleSecurePasswordChanged(TextBox textBox, AvaloniaPropertyChangedEventArgs e)
+    {
+        // If the property is being set and we aren't already watching this instance
+        if (e.NewValue is not null && !_textSubscriptions.TryGetValue(textBox, out _))
+        {
+            // SURGICAL: Subscribe ONLY to this specific TextBox's Text changes
+            var subscription = textBox.GetObservable(TextBox.TextProperty).Subscribe(_ => UpdateBuffer(textBox));
+
+            // LEAK PROTECTION: Store the subscription in a table that lets go when the TextBox is destroyed
+            _textSubscriptions.Add(textBox, subscription);
+        }
+    }
+
+    private static void UpdateBuffer(TextBox textBox)
+    {
+        // Clear any previously stored password buffer to minimize secret lifetime
+        var oldBuffer = GetSecurePassword(textBox);
+        if (oldBuffer != null)
+            Array.Clear(oldBuffer, 0, oldBuffer.Length);
+
+        var text = textBox.Text;
+        // Convert string to char[] and update the bound property
+        var newBuffer = string.IsNullOrEmpty(text) ? null : text.ToCharArray();
+        SetSecurePassword(textBox, newBuffer);
+    }
+
+    public static char[]? GetSecurePassword(TextBox element) => element.GetValue(SecurePasswordProperty);
+    public static void SetSecurePassword(TextBox element, char[]? value) => element.SetValue(SecurePasswordProperty, value);
+
+    /// <summary>
+    /// Securely clears the system clipboard to prevent sensitive data from persisting.
+    /// </summary>
+    /// <param name="topLevel">The current TopLevel (Window/Control) context.</param>
+    public static async System.Threading.Tasks.Task ClearClipboardAsync(TopLevel? topLevel)
+    {
+        var clipboard = topLevel?.Clipboard;
+        if (clipboard != null)
+        {
+            await clipboard.SetTextAsync(null);
+        }
+    }
+}

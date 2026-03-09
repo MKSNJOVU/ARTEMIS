@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Artemis.Core.Interfaces;
 using Artemis.Desktop.Services;
+using Artemis.Desktop.Models;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FileTypeChecker;
@@ -14,30 +15,46 @@ namespace Artemis.Desktop.ViewModels;
 public partial class DecryptionViewModel : ViewModelBase
 {
     #region Private Fields
-
     private readonly IEncryptionService _encryptionService;
     private readonly IFilePickerService _filePickerService;
     private readonly IDialogService _dialogService;
-    private byte[]? _selectedFileBytes;
     #endregion
 
     #region Properties
     [ObservableProperty]
     private string? _selectedFilePath;
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
     private string? _selectedFileName;
+
     [ObservableProperty]
-    private string? _password;
+    [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
+    private char[]? _passwordBuffer;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
+    private byte[]? _selectedFileBytes;
+
     [ObservableProperty]
     private string? _errorMessage;
     [ObservableProperty]
     private string? _statusMessage;
     [ObservableProperty]
     private double _progressValue;
+
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SelectFileCommand))]
     private bool _isDecrypting;
+
     [ObservableProperty]
     private bool _showProgress;
+
+    [ObservableProperty]
+    private OperationState _currentState = OperationState.Idle;
+
+    private bool CanDecrypt => !IsDecrypting && SelectedFileBytes is not null && PasswordBuffer?.Length > 0;
+    private bool CanSelectFile => !IsDecrypting;
     #endregion
 
     #region Constructor
@@ -50,160 +67,165 @@ public partial class DecryptionViewModel : ViewModelBase
     #endregion
 
     #region Commands
-    /// <summary>
-    /// Command to allow users to select a file
-    /// </summary>
-    /// <returns>The file name, file path and file bytes of a selected file.</returns>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSelectFile))]
     private async Task SelectFile()
     {
-        // Clearing previous errors
-        ErrorMessage = null;
-        StatusMessage = null;
+        ResetState();
 
-        // Getting the file path
         IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to decrypt");
 
-        // Safe return for canceled operation or empty path
         if (path is null || path.Count == 0)
             return;
 
-        // Clearing previous selections
-        _selectedFileBytes = null;
+        SelectedFileBytes = null;
         SelectedFilePath = null;
         SelectedFileName = null;
 
-        // Storing the file details
         SelectedFilePath = path[0];
         SelectedFileName = Path.GetFileName(path[0]);
 
         if (!Path.GetExtension(SelectedFileName).Equals(".enc", StringComparison.OrdinalIgnoreCase))
         {
             ErrorMessage = $"Cannot Decrypt {SelectedFileName} because it is the wrong file type.";
-
             SelectedFilePath = null;
             SelectedFileName = null;
+            CurrentState = OperationState.Faulted;
             return;
         }
         try
         {
-            _selectedFileBytes = await File.ReadAllBytesAsync(SelectedFilePath);
+            SelectedFileBytes = await File.ReadAllBytesAsync(SelectedFilePath);
         }
         catch
         {
-            // Clear selection state on failure and surface a user-friendly error
-            _selectedFileBytes = null;
+            SelectedFileBytes = null;
             SelectedFilePath = null;
             SelectedFileName = null;
-            StatusMessage = null;
             ErrorMessage = "Unable to read the selected file. It may have been moved, deleted, or is in use.";
+            CurrentState = OperationState.Faulted;
         }
     }
 
-    /// <summary>
-    /// Decrypt a selected file to its original type.
-    /// </summary>
-    /// <returns></returns>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanDecrypt))]
     private async Task Decrypt()
     {
-        // If guarding null or errant inputs
-        if (_selectedFileBytes is null)
-        {
-            ErrorMessage = "No file selected!";
-            return;
-        }
-        if (string.IsNullOrWhiteSpace(Password))
-        {
-            ErrorMessage = "Password cannot be empty!";
-            return;
-        }
-        // Clear previous errors
         ErrorMessage = null;
 
+        if (SelectedFileBytes is null || PasswordBuffer is null || PasswordBuffer.Length == 0)
+        {
+            ErrorMessage = SelectedFileBytes is null ? "No file selected!" : "Password cannot be empty!";
+            CurrentState = OperationState.Faulted;
+            return;
+        }
+
+        ErrorMessage = null;
         IsDecrypting = true;
+        ShowProgress = true;
+        CurrentState = OperationState.Processing;
 
-        // Assigning a local Password variable
-        string decryptingPassword = Password;
-        char[] passwordChars = decryptingPassword.ToCharArray(); ; // Prevents another threading from nulling out the property
-
+        // Secure Snapshot: Capture references and clone sensitive data to avoid race conditions and memory leaks.
+        char[]? passwordSnapshot = new char[PasswordBuffer.Length];
+        Array.Copy(PasswordBuffer, passwordSnapshot, PasswordBuffer.Length);
+        byte[]? fileSnapshot = SelectedFileBytes;
+        byte[]? decryptedBytes = null;
         try
         {
             StatusMessage = "Deriving decryption key...";
             ProgressValue = 15;
 
-            var decryptedBytes = await _encryptionService.DecryptAsync(_selectedFileBytes, passwordChars);
-            ProgressValue = 80;
-            StatusMessage = "Saving decrypted file...";
+            decryptedBytes = await _encryptionService.DecryptAsync(fileSnapshot!, passwordSnapshot!);
+
+            ProgressValue = 50;
+            StatusMessage = "Preparing to save...";
+            CurrentState = OperationState.Saving;
 
             string? decryptedFileName = Path.GetFileNameWithoutExtension(SelectedFileName);
             bool isSaveFile = await _dialogService.ShowConfirmationAsync("Save file to location?");
             if (!isSaveFile)
             {
                 StatusMessage = "Decryption process cancelled.";
-                ProgressValue = 0;
+                CurrentState = OperationState.Idle;
                 return;
             }
 
-            // Writing a file to its original type
+            string extension;
             using (var stream = new MemoryStream(decryptedBytes))
             {
                 var fileType = FileTypeValidator.GetFileType(stream);
-                string extension = fileType.Extension; // e.g., ".docx", ".jpeg"
-                var suggestedFileName = $"{decryptedFileName}{extension}";
-                var savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save your file");
-
-                if (string.IsNullOrWhiteSpace(savePath))
-                {
-                    StatusMessage = "Decryption process cancelled.";
-                    ProgressValue = 0;
-                    return;
-                }
-
-                if (File.Exists(savePath))
-                {
-                    var overwrite = await _dialogService.ShowConfirmationAsync(
-                        $"The file '{Path.GetFileName(savePath)}' already exists. Overwrite it?");
-                    if (!overwrite)
-                    {
-                        StatusMessage = "Decryption process cancelled.";
-                        ProgressValue = 0;
-                        return;
-                    }
-                }
-                await File.WriteAllBytesAsync(savePath, decryptedBytes);
-                decryptingPassword = null;
-                StatusMessage = "Decryption complete!";
-                ProgressValue = 100;
+                extension = fileType.Extension;
             }
 
+            var suggestedFileName = $"{decryptedFileName}{extension}";
+            var savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save your file");
+
+            if (string.IsNullOrWhiteSpace(savePath))
+            {
+                StatusMessage = "Decryption process cancelled.";
+                CurrentState = OperationState.Idle;
+                return;
+            }
+
+            if (File.Exists(savePath))
+            {
+                var overwrite = await _dialogService.ShowConfirmationAsync(
+                    $"The file '{Path.GetFileName(savePath)}' already exists. Overwrite it?");
+                if (!overwrite)
+                {
+                    StatusMessage = "Decryption process cancelled.";
+                    CurrentState = OperationState.Idle;
+                    return;
+                }
+            }
+
+            StatusMessage = "Writing file to disk...";
+            ProgressValue = 85;
+            await File.WriteAllBytesAsync(savePath, decryptedBytes);
+
+            StatusMessage = "Decryption complete!";
+            ProgressValue = 100;
+            CurrentState = OperationState.Completed;
         }
         catch (CryptographicException)
         {
             ErrorMessage = "Decryption failed. Wrong password or corrupted file.";
-            return;
+            CurrentState = OperationState.Faulted;
         }
         catch (UnauthorizedAccessException)
         {
             ErrorMessage = "You do not have permissions to open this file.";
-            return;
+            CurrentState = OperationState.Faulted;
         }
-        catch (IOException) // Handling the case of an opened file
+        catch (IOException)
         {
             ErrorMessage = "File is in use by another program. Please close it and try again.";
-            return;
+            CurrentState = OperationState.Faulted;
         }
         catch (Exception e)
         {
             ErrorMessage = e.Message;
-            return;
+            CurrentState = OperationState.Faulted;
         }
         finally
         {
-            Array.Clear(passwordChars, 0, passwordChars.Length);
+            if (passwordSnapshot is not null) Array.Clear(passwordSnapshot, 0, passwordSnapshot.Length);
+            if (decryptedBytes is not null) Array.Clear(decryptedBytes, 0, decryptedBytes.Length);
+            if (SelectedFileBytes is not null) Array.Clear(SelectedFileBytes, 0, SelectedFileBytes.Length);
+            if (PasswordBuffer is not null) Array.Clear(PasswordBuffer, 0, PasswordBuffer.Length);
+
             IsDecrypting = false;
+            SelectedFileBytes = null;
         }
     }
+    #endregion
 
+    #region Helper Methods
+    private void ResetState()
+    {
+        CurrentState = OperationState.Idle;
+        ShowProgress = false;
+        ProgressValue = 0;
+        StatusMessage = string.Empty;
+        ErrorMessage = null;
+    }
     #endregion
 }
