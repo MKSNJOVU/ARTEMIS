@@ -124,13 +124,17 @@ public partial class DecryptionViewModel : ViewModelBase
         ShowProgress = true;
         CurrentState = OperationState.Processing;
 
+        // Secure Snapshot: Capture references and clone sensitive data to avoid race conditions and memory leaks.
+        char[]? passwordSnapshot = new char[PasswordBuffer.Length];
+        Array.Copy(PasswordBuffer, passwordSnapshot, PasswordBuffer.Length);
+        byte[]? fileSnapshot = SelectedFileBytes;
         byte[]? decryptedBytes = null;
         try
         {
             StatusMessage = "Deriving decryption key...";
             ProgressValue = 15;
 
-            decryptedBytes = await _encryptionService.DecryptAsync(SelectedFileBytes, PasswordBuffer);
+            decryptedBytes = await _encryptionService.DecryptAsync(fileSnapshot!, passwordSnapshot!);
 
             ProgressValue = 50;
             StatusMessage = "Preparing to save...";
@@ -204,6 +208,7 @@ public partial class DecryptionViewModel : ViewModelBase
         }
         finally
         {
+            if (passwordSnapshot is not null) Array.Clear(passwordSnapshot, 0, passwordSnapshot.Length);
             if (decryptedBytes is not null) Array.Clear(decryptedBytes, 0, decryptedBytes.Length);
             if (SelectedFileBytes is not null) Array.Clear(SelectedFileBytes, 0, SelectedFileBytes.Length);
             if (PasswordBuffer is not null) Array.Clear(PasswordBuffer, 0, PasswordBuffer.Length);
