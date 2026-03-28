@@ -1,3 +1,4 @@
+# --- Android / IntelliJ ---
 *.iml
 .gradle
 /local.properties
@@ -7,17 +8,26 @@
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-.DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
-local.properties
 
-# .NET Build results
+# --- OS specific ---
+.DS_Store
+
+# --- .NET / Visual Studio ---
 [Bb]in/
 [Oo]bj/
+.vs/
+*.user
+*.suo
+*.log
 
-# Documentation
+# --- AI / Copilot ---
+.copilot/
+*.copilotindex
+
+# --- Documentation ---
 SecureShare_Guide.md
 GEMINI.md
