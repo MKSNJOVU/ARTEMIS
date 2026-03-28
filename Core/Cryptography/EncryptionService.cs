@@ -20,8 +20,12 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task<byte[]> EncryptAsync(byte[] plaintext, char[] password)
+    public async Task EncryptAsync(Stream source, Stream destination, char[] password)
     {
+        var dataStream = new MemoryStream();
+        await source.CopyToAsync(dataStream);
+        var plainText = dataStream.ToArray();
+
         // Generate the randomSalt
         var randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
@@ -33,14 +37,14 @@ public class EncryptionService : IEncryptionService
         RandomNumberGenerator.Fill(randomIV);
 
         // AES-GCM Encryption
-        var ciphertext = new byte[plaintext.Length];
+        var ciphertext = new byte[plainText.Length];
         var authenticationTag = new byte[CryptoConstants.TagSize];
 
         try
         {
             using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
-                aes.Encrypt(randomIV, plaintext, ciphertext, authenticationTag);
+                aes.Encrypt(randomIV, plainText, ciphertext, authenticationTag);
             }
         }
         finally
@@ -61,7 +65,7 @@ public class EncryptionService : IEncryptionService
         return result;
     }
 
-    public async Task<byte[]> DecryptAsync(byte[] encryptedData, char[] password)
+    public async Task DecryptAsync(Stream source, Stream destination, char[] password)
     {
         // Validate the minimum size of the encrypted data
         var minimumSize = CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize;
@@ -90,13 +94,13 @@ public class EncryptionService : IEncryptionService
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSalt);
 
         // Decrypt the data with AES-GCM
-        var plaintext = new byte[ciphertextLength];
+        var plainText = new byte[ciphertextLength];
 
         try
         {
             using (var aes = new AesGcm(key, extractedAuthTag.Length))
             {
-                aes.Decrypt(extractedIV, extractedCiphertext, extractedAuthTag, plaintext);
+                aes.Decrypt(extractedIV, extractedCiphertext, extractedAuthTag, plainText);
             }
         }
         catch (CryptographicException)
@@ -109,7 +113,7 @@ public class EncryptionService : IEncryptionService
             CryptographicOperations.ZeroMemory(key);
         }
 
-        return plaintext;
+        return plainText;
     }
     #endregion
 }

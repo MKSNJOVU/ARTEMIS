@@ -8,7 +8,7 @@ public interface IEncryptionService
     /// <param name="plaintext"></param>
     /// <param name="password"></param>
     /// <returns>byte[]</returns>
-    Task<byte[]> EncryptAsync(byte[] plaintext, char[] password);
+    Task EncryptAsync(Stream sourceFile, Stream destinationFile, char[] password);
 
     /// <summary>
     /// Decrypts data. Throws if password is wrong or data is corrupted.
@@ -16,5 +16,5 @@ public interface IEncryptionService
     /// <param name="encryptedData"></param>
     /// <param name="password"></param>
     /// <returns>original plaintext bytes</returns>
-    Task<byte[]> DecryptAsync(byte[] encryptedData, char[] password);
+    Task DecryptAsync(Stream sourceFile, Stream destinationFile, char[] password);
 }
