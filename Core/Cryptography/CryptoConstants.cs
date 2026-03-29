@@ -7,6 +7,7 @@ public static class CryptoConstants
     public const int SaltSize = 16;
     public const int IvSize = 12;
     public const int TagSize = 16;
+    public const int ChunkSizeBytes = 65536;
     #endregion
 
     #region Argon2id Constants
