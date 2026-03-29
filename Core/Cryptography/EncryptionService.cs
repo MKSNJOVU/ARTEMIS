@@ -20,7 +20,7 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task EncryptAsync(Stream source, Stream destination, char[] password)
+    public async Task EncryptAsync(Stream source, Stream destination, string password)
     {
         var dataStream = new MemoryStream();
         await source.CopyToAsync(dataStream);
@@ -65,7 +65,7 @@ public class EncryptionService : IEncryptionService
         return result;
     }
 
-    public async Task DecryptAsync(Stream source, Stream destination, char[] password)
+    public async Task DecryptAsync(Stream source, Stream destination, string password)
     {
         // Validate the minimum size of the encrypted data
         var minimumSize = CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize;
