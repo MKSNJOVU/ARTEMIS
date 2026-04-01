@@ -22,30 +22,51 @@ public class EncryptionService : IEncryptionService
     #region Methods
     public async Task EncryptAsync(Stream source, Stream destination, string password)
     {
-        var dataStream = new MemoryStream();
-        await source.CopyToAsync(dataStream);
-        var plainText = dataStream.ToArray();
-
-        // Generate the randomSalt
+        // Generate the randomSalt and randomIV
         var randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
 
+        await destination.WriteAsync(randomSalt);
+
         // Derive the AES key from password + salt
         var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
-        // Generate a random IV 
-        var randomIV = new byte[CryptoConstants.IvSize];
-        RandomNumberGenerator.Fill(randomIV);
-
-        // AES-GCM Encryption
-        var ciphertext = new byte[plainText.Length];
-        var authenticationTag = new byte[CryptoConstants.TagSize];
 
         try
         {
             using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
-                aes.Encrypt(randomIV, plainText, ciphertext, authenticationTag);
+                //Write the SALT to the Destination Stream
+                var buffer = new byte[CryptoConstants.ChunkSizeBytes];
+
+                // Looping through the chunks
+                int bytesRead = 0;
+                while ((bytesRead = await source.ReadAsync(buffer)) > 0)
+                {
+                    // Generate a randomIV
+                    var randomIV = new byte[CryptoConstants.IvSize];
+                    RandomNumberGenerator.Fill(randomIV);
+
+                    // Write the randomIV to the Destination Stream
+                    await destination.WriteAsync(randomIV);
+
+                    // AES-GCM Encryption
+                    var authenticationTag = new byte[CryptoConstants.TagSize];
+
+
+
+                    var plainTextSpan = new ReadOnlySpan<byte>(buffer, 0, bytesRead);
+                    var cipherText = new byte[bytesRead];
+
+                    aes.Encrypt(randomIV, plainTextSpan, cipherText, authenticationTag);
+                    // Write the authentication tag and ciphertext to the Destination Stream
+                    await destination.WriteAsync(cipherText);
+                    await destination.WriteAsync(authenticationTag);
+                }
             }
+        }
+        catch (Exception)
+        {
+            throw;
         }
         finally
         {
