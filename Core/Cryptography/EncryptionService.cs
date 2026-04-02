@@ -58,6 +58,7 @@ public class EncryptionService : IEncryptionService
                     var cipherText = new byte[bytesRead];
 
                     aes.Encrypt(randomIV, plainTextSpan, cipherText, authenticationTag);
+
                     // Write the authentication tag and ciphertext to the Destination Stream
                     await destination.WriteAsync(cipherText);
                     await destination.WriteAsync(authenticationTag);
@@ -72,18 +73,6 @@ public class EncryptionService : IEncryptionService
         {
             CryptographicOperations.ZeroMemory(key);
         }
-
-
-        // Assemble the output
-        var result = new byte[CryptoConstants.SaltSize + CryptoConstants.IvSize + ciphertext.Length + CryptoConstants.TagSize];
-
-        Buffer.BlockCopy(randomSalt, Offset, result, Offset, randomSalt.Length);
-        Buffer.BlockCopy(randomIV, Offset, result, randomSalt.Length, randomIV.Length);
-        Buffer.BlockCopy(ciphertext, Offset, result, randomSalt.Length + randomIV.Length, ciphertext.Length);
-        Buffer.BlockCopy(authenticationTag, Offset, result, randomSalt.Length + randomIV.Length + ciphertext.Length, authenticationTag.Length);
-
-
-        return result;
     }
 
     public async Task DecryptAsync(Stream source, Stream destination, string password)
