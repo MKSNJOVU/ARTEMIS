@@ -78,39 +78,48 @@ public class EncryptionService : IEncryptionService
     public async Task DecryptAsync(Stream source, Stream destination, string password)
     {
         // Validate the minimum size of the encrypted data
-        var minimumSize = CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize;
+        bool minimumSize = source.Length >= (CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize);
 
-        if (encryptedData.Length < minimumSize)
-            throw new ArgumentException("Invalid encrypted data: input is too short!");
+        if (!minimumSize)
+            throw new ArgumentException("Invalid encrypted data!");
 
         // Extract the Salt
         var extractedSalt = new byte[CryptoConstants.SaltSize];
-        Buffer.BlockCopy(encryptedData, Offset, extractedSalt, Offset, extractedSalt.Length);
-
-        // Extract the IV (nonce)
-        var extractedIV = new byte[CryptoConstants.IvSize];
-        Buffer.BlockCopy(encryptedData, extractedSalt.Length, extractedIV, Offset, extractedIV.Length);
-
-        // Extract the ciphertext
-        var ciphertextLength = encryptedData.Length - CryptoConstants.SaltSize - CryptoConstants.IvSize - CryptoConstants.TagSize;
-        var extractedCiphertext = new byte[ciphertextLength];
-        Buffer.BlockCopy(encryptedData, extractedSalt.Length + extractedIV.Length, extractedCiphertext, Offset, ciphertextLength);
-
-        // Extract the Authentication Tag
-        var extractedAuthTag = new byte[CryptoConstants.TagSize];
-        Buffer.BlockCopy(encryptedData, encryptedData.Length - extractedAuthTag.Length, extractedAuthTag, Offset, extractedAuthTag.Length);
+        await source.ReadExactlyAsync(extractedSalt);
 
         // Derive the key
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSalt);
 
-        // Decrypt the data with AES-GCM
-        var plainText = new byte[ciphertextLength];
-
         try
         {
-            using (var aes = new AesGcm(key, extractedAuthTag.Length))
+
+            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
-                aes.Decrypt(extractedIV, extractedCiphertext, extractedAuthTag, plainText);
+                // Extract the IV
+                var extractedIV = new byte[CryptoConstants.IvSize];
+
+                // Create a Decrypt buffer
+                var cipherTextBufffer = new byte[CryptoConstants.IvSize];
+
+                // Looping through the chunks
+                int bytesRead = 0;
+                while ((bytesRead = await source.ReadAsync(cipherTextBufffer)) > 0)
+                {
+
+                    await source.ReadExactlyAsync(extractedIV);
+
+
+                    // AES-GCM Decryption
+                    var authenticationTag = new byte[CryptoConstants.TagSize];
+
+                    var plainText = new byte[bytesRead];
+                    var decryptedCipherText = new ReadOnlySpan<byte>(cipherTextBufffer, 0, bytesRead);
+
+                    aes.Decrypt(extractedIV, decryptedCipherText, authenticationTag, plainText);
+
+                    await destination.WriteAsync(plainText);
+                }
+
             }
         }
         catch (CryptographicException)
@@ -122,8 +131,6 @@ public class EncryptionService : IEncryptionService
         {
             CryptographicOperations.ZeroMemory(key);
         }
-
-        return plainText;
     }
     #endregion
 }
