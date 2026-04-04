@@ -1,4 +1,5 @@
 using Artemis.Core.Interfaces;
+using System.Buffers;
 using System.Security.Cryptography;
 namespace Artemis.Core.Cryptography;
 
@@ -22,59 +23,148 @@ public class EncryptionService : IEncryptionService
     #region Methods
     public async Task EncryptAsync(Stream source, Stream destination, string password)
     {
-        // Generate the randomSalt and randomIV
+        // 1. Generate and Write the Global Salt (Header)
         var randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
-
         await destination.WriteAsync(randomSalt);
 
-        // Derive the AES key from password + salt
+        // 2. Derive the AES key
         var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
 
         try
         {
             using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
-                //Write the SALT to the Destination Stream
-                var buffer = new byte[CryptoConstants.ChunkSizeBytes];
+                // 3. MEMORY OPTIMIZATION: Allocate/Rent buffers ONCE outside the loop!
+                // We use ArrayPool for the large 64KB buffers to save the Garbage Collector
+                byte[] plainTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
+                byte[] cipherTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
 
-                // Looping through the chunks
+                // Fixed-size small buffers
+                byte[] ivBuffer = new byte[CryptoConstants.IvSize];
+                byte[] tagBuffer = new byte[CryptoConstants.TagSize];
+                byte[] lengthBuffer = new byte[sizeof(int)]; // 4 bytes to hold the chunk length
+
                 int bytesRead = 0;
-                while ((bytesRead = await source.ReadAsync(buffer)) > 0)
+                int chunkIndex = 0; // 4. INTEGRITY: Keep track of which chunk we are on
+
+                // 5. Loop through the source file
+                while ((bytesRead = await source.ReadAsync(plainTextBuffer, 0, CryptoConstants.ChunkSizeBytes)) > 0)
                 {
-                    // Generate a randomIV
-                    var randomIV = new byte[CryptoConstants.IvSize];
-                    RandomNumberGenerator.Fill(randomIV);
+                    // -- PREPARE THE DATA --
 
-                    // Write the randomIV to the Destination Stream
-                    await destination.WriteAsync(randomIV);
+                    // Generate a fresh IV for this chunk
+                    RandomNumberGenerator.Fill(ivBuffer);
 
-                    // AES-GCM Encryption
-                    var authenticationTag = new byte[CryptoConstants.TagSize];
+                    // Convert our chunkIndex into bytes for the AAD (Reordering Shield)
+                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
 
+                    // Slice our rented buffers to the exact size of the data we just read
+                    var plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
+                    var cipherTextSpan = new Span<byte>(cipherTextBuffer, 0, bytesRead);
 
+                    // -- ENCRYPT --
 
-                    var plainTextSpan = new ReadOnlySpan<byte>(buffer, 0, bytesRead);
-                    var cipherText = new byte[bytesRead];
+                    // Pass the AAD in so the chunk's position is cryptographically locked!
+                    aes.Encrypt(ivBuffer, plainTextSpan, cipherTextSpan, tagBuffer, associatedData: aadBytes);
 
-                    aes.Encrypt(randomIV, plainTextSpan, cipherText, authenticationTag);
+                    // -- WRITE TO DESTINATION (V2 Format) --
 
-                    // Write the authentication tag and ciphertext to the Destination Stream
-                    await destination.WriteAsync(cipherText);
-                    await destination.WriteAsync(authenticationTag);
+                    // A. Write the Chunk Length Prefix (4 bytes)
+                    BitConverter.TryWriteBytes(lengthBuffer, bytesRead);
+                    await destination.WriteAsync(lengthBuffer);
+
+                    // B. Write the IV (12 bytes)
+                    await destination.WriteAsync(ivBuffer);
+
+                    // C. Write the Ciphertext (variable size, up to 64KB)
+                    // We use ReadOnlyMemory to write from a rented array safely
+                    await destination.WriteAsync(new ReadOnlyMemory<byte>(cipherTextBuffer, 0, bytesRead));
+
+                    // D. Write the Authentication Tag (16 bytes)
+                    await destination.WriteAsync(tagBuffer);
+
+                    // Increment the index for the next loop!
+                    chunkIndex++;
                 }
+
+                // 6. Cleanup: Return the large buffers to the system pool
+                ArrayPool<byte>.Shared.Return(plainTextBuffer, clearArray: true);
+                ArrayPool<byte>.Shared.Return(cipherTextBuffer, clearArray: true);
             }
-        }
-        catch (Exception)
-        {
-            throw;
         }
         finally
         {
+            // Always securely wipe the AES key
             CryptographicOperations.ZeroMemory(key);
         }
     }
 
+
+    public async Task DecryptAsync(Stream source, Stream destination, string password)
+    {
+        // 1. Prepare and read the Global Salt (Header)
+        var randomSalt = new byte[CryptoConstants.SaltSize];
+        RandomNumberGenerator.Fill(randomSalt);
+        await source.ReadExactlyAsync(randomSalt);
+
+        // 2. Derive the AES key (Only happens once!)
+        var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
+
+        try
+        {
+            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
+            {
+                // 3. MEMORY OPTIMIZATION: Rent/Allocate buffers ONCE
+                // [YOUR TURN: Rent the plainTextBuffer and cipherTextBuffer using ArrayPool<byte>.Shared.Rent]
+                // [YOUR TURN: Create the small fixed-size buffers: ivBuffer, tagBuffer, lengthBuffer]
+
+                int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
+
+                // 4. THE RADAR: Read the 4-byte chunk length.
+                // If it returns 0, we cleanly hit the end of the file!
+                int lengthBytesRead = 0;
+                while ((lengthBytesRead = await source.ReadAsync(lengthBuffer)) > 0)
+                {
+                    // If we read some bytes but not exactly 4, the file is corrupted/cut off
+                    if (lengthBytesRead != sizeof(int))
+                        throw new CryptographicException("Corrupted file: Missing chunk length header.");
+
+                    // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
+                    int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);
+
+                    // 5. READ THE EXACT CHUNK COMPONENTS IN ORDER
+                    // [YOUR TURN: Use ReadExactlyAsync to read the IV into your ivBuffer]
+                    // [YOUR TURN: Use ReadExactlyAsync to read the Ciphertext into your cipherTextBuffer. Hint: Use currentCiphertextLength]
+                    // [YOUR TURN: Use ReadExactlyAsync to read the Tag into your tagBuffer]
+
+                    // 6. PREPARE THE SPANS & AAD
+                    // [YOUR TURN: Convert chunkIndex to an aadBytes array using BitConverter]
+                    // [YOUR TURN: Create a ReadOnlySpan for the Ciphertext based on currentCiphertextLength]
+                    // [YOUR TURN: Create a Span for the Plaintext based on currentCiphertextLength]
+
+                    // 7. DECRYPT
+                    // [YOUR TURN: Call aes.Decrypt. Don't forget to pass the aadBytes!]
+
+                    // 8. WRITE TO DESTINATION
+                    // [YOUR TURN: Write the decrypted Plaintext span to the destination stream]
+
+                    // Increment the index for the next loop!
+                    chunkIndex++;
+                }
+            }
+        }
+        catch (CryptographicException)
+        {
+            throw new CryptographicException("Decryption failed. Wrong password or corrupted/tampered data!");
+        }
+        finally
+        {
+            // 9. CLEANUP
+            // [YOUR TURN: Securely wipe the AES key]
+            // [YOUR TURN: Return the large plainTextBuffer and cipherTextBuffer to the ArrayPool]
+        }
+    }
     public async Task DecryptAsync(Stream source, Stream destination, string password)
     {
         // Validate the minimum size of the encrypted data
@@ -106,8 +196,13 @@ public class EncryptionService : IEncryptionService
 
                 while ((ivBytesRead = await source.ReadAsync(extractedIV)) > 0)
                 {
-                    if (ivBytesRead is not CryptoConstants.IvSize)
-                        throw new CryptographicException("Corrupted file!");
+                    while (ivBytesRead < CryptoConstants.IvSize)
+                    {
+                        int bytesRead = await source.ReadAsync(extractedIV.AsMemory(ivBytesRead, CryptoConstants.IvSize - ivBytesRead));
+                        if (bytesRead == 0)
+                            throw new CryptographicException("Corrupted file!");
+                        ivBytesRead += bytesRead;
+                    }
 
                     // AES-GCM Decryption
                     int chunkBytesRead = await source.ReadAsync(cipherTextBufffer);
