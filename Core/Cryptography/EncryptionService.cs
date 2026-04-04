@@ -100,29 +100,27 @@ public class EncryptionService : IEncryptionService
 
                 // Looping through the chunks
                 int ivBytesRead = 0;
+
+                // Create a Decrypt buffer
+                var cipherTextBufffer = new byte[CryptoConstants.ChunkSizeBytes + CryptoConstants.TagSize];
+
                 while ((ivBytesRead = await source.ReadAsync(extractedIV)) > 0)
                 {
                     if (ivBytesRead is not CryptoConstants.IvSize)
                         throw new CryptographicException("Corrupted file!");
 
-                    // Create a Decrypt buffer
-                    var cipherTextBufffer = new byte[CryptoConstants.ChunkSizeBytes + CryptoConstants.TagSize];
-
                     // AES-GCM Decryption
-                    var authenticationTag = new byte[CryptoConstants.TagSize];
-
                     int chunkBytesRead = await source.ReadAsync(cipherTextBufffer);
+                    int cipherTextLength = chunkBytesRead - CryptoConstants.TagSize;
 
-                    var plainText = new byte[ivBytesRead];
-                    var decryptedCipherText = new ReadOnlySpan<byte>(cipherTextBufffer, 0, CryptoConstants.ChunkSizeBytes);
+                    var plainText = new byte[cipherTextLength];
+                    var decryptedCipherText = new ReadOnlySpan<byte>(cipherTextBufffer, 0, cipherTextLength);
                     var decryptedTag = new ReadOnlySpan<byte>(cipherTextBufffer, chunkBytesRead - CryptoConstants.TagSize, CryptoConstants.TagSize);
 
-
-                    aes.Decrypt(extractedIV, decryptedCipherText, authenticationTag, plainText);
+                    aes.Decrypt(extractedIV, decryptedCipherText, decryptedTag, plainText);
 
                     await destination.WriteAsync(plainText);
                 }
-
             }
         }
         catch (CryptographicException)
