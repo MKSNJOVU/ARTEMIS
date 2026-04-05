@@ -3,18 +3,20 @@ namespace Artemis.Core.Interfaces;
 public interface IEncryptionService
 {
     /// <summary>
-    /// Uses AES-256-GCM with Argon2id derived key to encrypt plaintext. 
+    /// Uses AES-256-GCM with Argon2id derived key to encrypt source stream into designated destination. 
     /// </summary>
-    /// <param name="plaintext"></param>
+    /// <param name="sourceFile"></param>
+    /// <param name="destinationFile"></param>
     /// <param name="password"></param>
     /// <returns>byte[]</returns>
-    Task<byte[]> EncryptAsync(byte[] plaintext, char[] password);
+    Task EncryptAsync(Stream sourceFile, Stream destinationFile, string password);
 
     /// <summary>
     /// Decrypts data. Throws if password is wrong or data is corrupted.
     /// </summary>
-    /// <param name="encryptedData"></param>
+    /// <param name="sourceFile"></param>
+    /// <param name="destinationFile"></param>
     /// <param name="password"></param>
-    /// <returns>original plaintext bytes</returns>
-    Task<byte[]> DecryptAsync(byte[] encryptedData, char[] password);
+    /// <returns>oplaintext</returns>
+    Task DecryptAsync(Stream sourceFile, Stream destinationFile, string password);
 }

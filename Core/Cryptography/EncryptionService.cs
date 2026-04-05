@@ -1,4 +1,5 @@
 using Artemis.Core.Interfaces;
+using System.Buffers;
 using System.Security.Cryptography;
 namespace Artemis.Core.Cryptography;
 
@@ -20,96 +21,159 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task<byte[]> EncryptAsync(byte[] plaintext, char[] password)
+    public async Task EncryptAsync(Stream source, Stream destination, string password)
     {
-        // Generate the randomSalt
+        // Generate and Write the Global Salt (Header)
         var randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
+        await destination.WriteAsync(randomSalt);
 
-        // Derive the AES key from password + salt
+        //  Derive the AES key
         var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
-        // Generate a random IV 
-        var randomIV = new byte[CryptoConstants.IvSize];
-        RandomNumberGenerator.Fill(randomIV);
-
-        // AES-GCM Encryption
-        var ciphertext = new byte[plaintext.Length];
-        var authenticationTag = new byte[CryptoConstants.TagSize];
 
         try
         {
             using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
-                aes.Encrypt(randomIV, plaintext, ciphertext, authenticationTag);
+                //MEMORY OPTIMIZATION: Allocate/Rent buffers ONCE outside the loop!
+                // We use ArrayPool for the large 64KB buffers to save the Garbage Collector
+                byte[] plainTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
+                byte[] cipherTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
+
+                // Fixed-size small buffers
+                byte[] ivBuffer = new byte[CryptoConstants.IvSize];
+                byte[] tagBuffer = new byte[CryptoConstants.TagSize];
+                byte[] lengthBuffer = new byte[sizeof(int)]; // 4 bytes to hold the chunk length
+
+                int bytesRead = 0;
+                int chunkIndex = 0; // 4. INTEGRITY: Keep track of which chunk we are on
+
+                // Loop through the source file
+                while ((bytesRead = await source.ReadAsync(plainTextBuffer.AsMemory(0, CryptoConstants.ChunkSizeBytes))) > 0)
+                {
+                    // -- PREPARE THE DATA --
+
+                    // Generate a fresh IV for this chunk
+                    RandomNumberGenerator.Fill(ivBuffer);
+
+                    // Convert our chunkIndex into bytes for the AAD (Reordering Shield)
+                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
+
+                    // Slice our rented buffers to the exact size of the data we just read
+                    var plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
+                    var cipherTextSpan = new Span<byte>(cipherTextBuffer, 0, bytesRead);
+
+                    // -- ENCRYPT --
+
+                    // Pass the AAD in so the chunk's position is cryptographically locked!
+                    aes.Encrypt(ivBuffer, plainTextSpan, cipherTextSpan, tagBuffer, associatedData: aadBytes);
+
+                    // -- WRITE TO DESTINATION --
+
+                    // A. Write the Chunk Length Prefix (4 bytes)
+                    BitConverter.TryWriteBytes(lengthBuffer, bytesRead);
+                    await destination.WriteAsync(lengthBuffer);
+
+                    // B. Write the IV (12 bytes)
+                    await destination.WriteAsync(ivBuffer);
+
+                    // C. Write the Ciphertext (variable size, up to 64KB)
+                    // We use ReadOnlyMemory to write from a rented array safely
+                    await destination.WriteAsync(new ReadOnlyMemory<byte>(cipherTextBuffer, 0, bytesRead));
+
+                    // D. Write the Authentication Tag (16 bytes)
+                    await destination.WriteAsync(tagBuffer);
+
+                    // Increment the index for the next loop!
+                    chunkIndex++;
+                }
+
+                // 6. Cleanup: Return the large buffers to the system pool
+                ArrayPool<byte>.Shared.Return(plainTextBuffer, clearArray: true);
+                ArrayPool<byte>.Shared.Return(cipherTextBuffer, clearArray: true);
             }
         }
         finally
         {
+            // Always securely wipe the AES key
             CryptographicOperations.ZeroMemory(key);
         }
-
-
-        // Assemble the output
-        var result = new byte[CryptoConstants.SaltSize + CryptoConstants.IvSize + ciphertext.Length + CryptoConstants.TagSize];
-
-        Buffer.BlockCopy(randomSalt, Offset, result, Offset, randomSalt.Length);
-        Buffer.BlockCopy(randomIV, Offset, result, randomSalt.Length, randomIV.Length);
-        Buffer.BlockCopy(ciphertext, Offset, result, randomSalt.Length + randomIV.Length, ciphertext.Length);
-        Buffer.BlockCopy(authenticationTag, Offset, result, randomSalt.Length + randomIV.Length + ciphertext.Length, authenticationTag.Length);
-
-
-        return result;
     }
 
-    public async Task<byte[]> DecryptAsync(byte[] encryptedData, char[] password)
+
+    public async Task DecryptAsync(Stream source, Stream destination, string password)
     {
-        // Validate the minimum size of the encrypted data
-        var minimumSize = CryptoConstants.SaltSize + CryptoConstants.IvSize + CryptoConstants.TagSize;
+        // Prepare and read the Global Salt (Header)
+        var extractedSALT = new byte[CryptoConstants.SaltSize];
+        await source.ReadExactlyAsync(extractedSALT);
 
-        if (encryptedData.Length < minimumSize)
-            throw new ArgumentException("Invalid encrypted data: input is too short!");
+        // Derive the AES key (Only happens once!)
+        var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
 
-        // Extract the Salt
-        var extractedSalt = new byte[CryptoConstants.SaltSize];
-        Buffer.BlockCopy(encryptedData, Offset, extractedSalt, Offset, extractedSalt.Length);
-
-        // Extract the IV (nonce)
-        var extractedIV = new byte[CryptoConstants.IvSize];
-        Buffer.BlockCopy(encryptedData, extractedSalt.Length, extractedIV, Offset, extractedIV.Length);
-
-        // Extract the ciphertext
-        var ciphertextLength = encryptedData.Length - CryptoConstants.SaltSize - CryptoConstants.IvSize - CryptoConstants.TagSize;
-        var extractedCiphertext = new byte[ciphertextLength];
-        Buffer.BlockCopy(encryptedData, extractedSalt.Length + extractedIV.Length, extractedCiphertext, Offset, ciphertextLength);
-
-        // Extract the Authentication Tag
-        var extractedAuthTag = new byte[CryptoConstants.TagSize];
-        Buffer.BlockCopy(encryptedData, encryptedData.Length - extractedAuthTag.Length, extractedAuthTag, Offset, extractedAuthTag.Length);
-
-        // Derive the key
-        var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSalt);
-
-        // Decrypt the data with AES-GCM
-        var plaintext = new byte[ciphertextLength];
-
+        // MEMORY OPTIMIZATION: Rent/Allocate buffers ONCE
+        byte[] plainTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
+        byte[] cipherTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
         try
         {
-            using (var aes = new AesGcm(key, extractedAuthTag.Length))
+            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
             {
-                aes.Decrypt(extractedIV, extractedCiphertext, extractedAuthTag, plaintext);
+                byte[] ivBuffer = new byte[CryptoConstants.IvSize];
+                byte[] tagBuffer = new byte[CryptoConstants.TagSize];
+                byte[] lengthBuffer = new byte[sizeof(int)];
+
+                int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
+
+                // THE RADAR: Read the 4-byte chunk length.
+                // If it returns 0, we cleanly hit the end of the file!
+                int lengthBytesRead = 0;
+
+                while ((lengthBytesRead = await source.ReadAsync(lengthBuffer)) > 0)
+                {
+                    // If we read some bytes but not exactly 4, the file is corrupted/cut off
+                    if (lengthBytesRead != sizeof(int))
+                        throw new CryptographicException("Corrupted file: Missing chunk length header.");
+
+                    // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
+                    int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);
+
+                    // READ THE EXACT CHUNK COMPONENTS IN ORDER
+                    await source.ReadExactlyAsync(ivBuffer);
+
+                    await source.ReadExactlyAsync(new Memory<byte>(cipherTextBuffer, 0, currentCiphertextLength));
+
+                    await source.ReadExactlyAsync(tagBuffer);
+
+                    // PREPARE THE SPANS & AAD
+
+                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
+
+                    var cipherText = new ReadOnlySpan<byte>(cipherTextBuffer, 0, currentCiphertextLength);
+
+                    var plainText = new Span<byte>(plainTextBuffer, lengthBytesRead, currentCiphertextLength);
+
+                    //  DECRYPT
+                    aes.Decrypt(ivBuffer, cipherText, tagBuffer, plainText, associatedData: aadBytes);
+
+                    // WRITE TO DESTINATION
+                    await destination.WriteAsync(new ReadOnlyMemory<byte>(plainTextBuffer, 0, currentCiphertextLength));
+
+                    // Increment the index for the next loop!
+                    chunkIndex++;
+                }
             }
         }
         catch (CryptographicException)
         {
-
             throw new CryptographicException("Decryption failed. Wrong password or corrupted/tampered data!");
         }
         finally
         {
+            //  CLEANUP
             CryptographicOperations.ZeroMemory(key);
-        }
 
-        return plaintext;
+            ArrayPool<byte>.Shared.Return(plainTextBuffer, clearArray: true);
+            ArrayPool<byte>.Shared.Return(cipherTextBuffer, clearArray: true);
+        }
     }
     #endregion
 }

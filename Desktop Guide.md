@@ -5,6 +5,7 @@
 Implement a cross-platform desktop zero-knowledge file encryption application that is fully interoperable with the existing Android/Kotlin MKSSecureShare app and the Web app. Like Signal, the application **never** transmits passwords or plaintext — all cryptographic operations happen locally on the user's machine.
 
 **Architecture:**
+
 - **Artemis.Core**: Shared .NET 10 class library — Argon2id key derivation + AES-256-GCM encryption/decryption
 - **Artemis.Desktop**: Avalonia UI (.NET 10) with CommunityToolkit.Mvvm — desktop UI for encrypt/decrypt operations
 - **Interoperability**: Byte-identical file format with Android app and Web app
@@ -97,6 +98,7 @@ Artemis/
 All cryptographic logic lives in the shared `Artemis.Core` library. This is the strategic design: both `Artemis.Desktop` and potentially the `Web` project can consume the same battle-tested crypto code without duplication.
 
 **NuGet packages already installed:**
+
 - `Konscious.Security.Cryptography.Argon2` 1.3.1 — Argon2id key derivation
 - `System.Security.Cryptography.AesGcm` — built into .NET 10, no package needed
 
@@ -109,15 +111,18 @@ All cryptographic logic lives in the shared `Artemis.Core` library. This is the 
 **Purpose:** A single source of truth for all cryptographic parameters. These values MUST match the Kotlin `CryptoConstants.kt` exactly — any mismatch breaks interoperability.
 
 **Research:**
+
 - C# `static class` and `const` fields: https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/static-classes-and-static-class-members
 - Why `const` over `static readonly` for compile-time constants: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/const
 
 **What to implement:**
+
 1. A `public static class` named `CryptoConstants` in namespace `Artemis.Core.Cryptography`
 2. `const` fields for every parameter in the table above
 3. Group them logically: AES-GCM config, then Argon2id config
 
 **Fields to define:**
+
 ```
 AES-GCM Configuration:
 - KeySizeBytes:     32      (256 bits / 8)
@@ -134,6 +139,7 @@ Argon2id Configuration:
 **Kotlin reference:** `Kotlin/app/src/main/java/com/example/mkssecureshare/CryptoConstants.kt`
 
 **Code Shell:**
+
 ```csharp
 namespace Artemis.Core.Cryptography;
 
@@ -167,6 +173,7 @@ public static class CryptoConstants
 Define contracts in `Core/Interfaces/` so the Desktop project depends on abstractions, not implementations. This follows the Dependency Inversion Principle and makes testing straightforward.
 
 **Research:**
+
 - C# interfaces: https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/types/interfaces
 - Dependency Inversion Principle: https://learn.microsoft.com/en-us/dotnet/architecture/modern-web-apps-azure/architectural-principles#dependency-inversion
 
@@ -179,15 +186,18 @@ Define contracts in `Core/Interfaces/` so the Desktop project depends on abstrac
 **Purpose:** Contract for deriving an AES-256 key from a password and salt using Argon2id.
 
 **What to define:**
+
 - A single method: `DeriveKey(string password, byte[] salt)` that returns `Task<byte[]>`
 - The returned byte array is always 32 bytes (256 bits)
 - It is `Task<byte[]>` because Argon2id with 64MB memory is CPU-intensive and should not block the UI thread
 
 **Concepts to look up:**
+
 - `Task<T>` for async return types: https://learn.microsoft.com/en-us/dotnet/csharp/asynchronous-programming/
 - Why async for CPU-bound work on a UI thread
 
 **Code Shell:**
+
 ```csharp
 namespace Artemis.Core.Interfaces;
 
@@ -228,10 +238,12 @@ Method 2: DecryptAsync(byte[] encryptedData, string password)
 ```
 
 **Concepts to look up:**
+
 - Method signatures with `Task<byte[]>` return type
 - XML documentation comments (`///`)
 
 **Code Shell:**
+
 ```csharp
 namespace Artemis.Core.Interfaces;
 
@@ -288,6 +300,7 @@ Important notes:
 ```
 
 **Research:**
+
 - Konscious.Security.Cryptography API: https://github.com/kmaragon/Konscious.Security.Cryptography
 - Argon2id usage pattern: https://asecuritysite.com/csharp/csharp_argon2
 - `using` statement for IDisposable: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/using
@@ -297,6 +310,7 @@ Important notes:
 **Kotlin reference:** `Kotlin/app/src/main/java/com/example/mkssecureshare/PasswordKeyManager.kt`
 
 **Code Shell:**
+
 ```csharp
 using System.Text;
 using Artemis.Core.Interfaces;
@@ -342,6 +356,7 @@ public class KeyDerivationService : IKeyDerivationService
 This is the heart of the system. Compare directly to your Kotlin `EncryptionManager.kt` — the logic is nearly identical.
 
 **Research:**
+
 - `AesGcm` class: https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.aesgcm
 - `AesGcm.Encrypt()`: https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.aesgcm.encrypt
 - `AesGcm.Decrypt()`: https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.aesgcm.decrypt
@@ -424,6 +439,7 @@ Concepts to look up:
 ```
 
 **Code Shell:**
+
 ```csharp
 public async Task<byte[]> EncryptAsync(byte[] plaintext, string password)
 {
@@ -542,6 +558,7 @@ Concepts to look up:
 ```
 
 **Code Shell:**
+
 ```csharp
 public async Task<byte[]> DecryptAsync(byte[] encryptedData, string password)
 {
@@ -620,15 +637,18 @@ public async Task<byte[]> DecryptAsync(byte[] encryptedData, string password)
 **Purpose:** A simple model to carry encryption results with metadata. Useful when the UI needs to know the original filename, file size, or other context alongside the encrypted bytes.
 
 **What to define:**
+
 - `byte[] EncryptedData` — the encrypted output
 - `string OriginalFileName` — original file name for later decryption
 - `long OriginalSize` — original file size in bytes
 
 **Research:**
+
 - C# records: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/builtin-types/record
 - Records vs classes for data carriers
 
 **Code Shell:**
+
 ```csharp
 namespace Artemis.Core.Models;
 
@@ -660,6 +680,7 @@ The UI layer consumes the `Artemis.Core` cryptographic services through dependen
 | `<ContentControl Content="{Binding}">` | Same | Used for view switching |
 
 **Research:**
+
 - Avalonia XAML basics: https://docs.avaloniaui.net/docs/basics/user-interface/introduction-to-xaml
 - Avalonia data binding: https://docs.avaloniaui.net/docs/basics/data/data-binding/
 - Compiled bindings: https://docs.avaloniaui.net/docs/basics/data/data-binding/compiled-bindings
@@ -704,6 +725,7 @@ Commands to define (use [RelayCommand]):
 ```
 
 **Research:**
+
 - `[ObservableProperty]` attribute: https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty
 - `[RelayCommand]` attribute: https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/relaycommand
 - `partial` classes (required for source generators): https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/partial-classes-and-methods
@@ -792,6 +814,7 @@ Logic:
 ```
 
 **Research:**
+
 - Partial method hooks in CommunityToolkit.Mvvm: https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty#running-code-upon-changes
 
 ---
@@ -880,6 +903,7 @@ Logic:
 A UserControl that displays the encryption form. Uses compiled bindings to EncryptViewModel.
 
 **Research:**
+
 - Avalonia UserControl: https://docs.avaloniaui.net/docs/basics/user-interface/controls/creating-controls/user-controls
 - Avalonia built-in controls: https://docs.avaloniaui.net/docs/reference/controls/
 - TextBox: https://docs.avaloniaui.net/docs/reference/controls/textbox
@@ -917,6 +941,7 @@ A UserControl that displays the encryption form. Uses compiled bindings to Encry
    - Disabled when `IsEncrypting` is true: `IsEnabled="{Binding !IsEncrypting}"`
 
 **Code Shell:**
+
 ```xml
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -950,6 +975,7 @@ A UserControl that displays the encryption form. Uses compiled bindings to Encry
 ```
 
 **Code-behind** (`EncryptView.axaml.cs`):
+
 ```csharp
 using Avalonia.Controls;
 
@@ -971,6 +997,7 @@ public partial class EncryptView : UserControl
 **Path:** `Desktop/Views/DecryptView.axaml`
 
 Similar to EncryptView but simpler:
+
 - File selection (with .enc hint)
 - Single password field (no confirmation)
 - Progress bar + status
@@ -978,6 +1005,7 @@ Similar to EncryptView but simpler:
 - Decrypt button
 
 **Code Shell:**
+
 ```xml
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -1013,6 +1041,7 @@ Similar to EncryptView but simpler:
 **Purpose:** Set up navigation between Encrypt and Decrypt views using a `ContentControl` pattern. The MainWindow hosts a navigation bar and swaps content based on the selected view.
 
 **Research:**
+
 - Avalonia navigation patterns: https://docs.avaloniaui.net/docs/concepts/the-mvvm-pattern/avalonia-ui-and-mvvm
 - ContentControl for view switching: https://docs.avaloniaui.net/docs/guides/implementation-guides/how-to-use-the-mvvm-pattern
 - ViewLocator (already generated): maps ViewModel → View automatically
@@ -1063,6 +1092,7 @@ Structure:
 ```
 
 The `ViewLocator` (already in the project) handles the magic:
+
 - When `CurrentView` is an `EncryptViewModel` → it renders `EncryptView`
 - When `CurrentView` is a `DecryptViewModel` → it renders `DecryptView`
 
@@ -1082,6 +1112,7 @@ Logic:
 ```
 
 **Research:**
+
 - For a small app, manual constructor injection is fine
 - For larger apps, consider Microsoft.Extensions.DependencyInjection:
   https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection
@@ -1095,10 +1126,12 @@ Logic:
 **Purpose:** Wraps Avalonia's file dialog APIs so ViewModels don't depend directly on UI types. This makes ViewModels testable.
 
 **Research:**
+
 - Avalonia StorageProvider API: https://docs.avaloniaui.net/docs/concepts/services/storage-provider/file-picker
 - IStorageProvider interface
 
 **What to define:**
+
 - `IFileDialogService` interface with:
   - `Task<string?> OpenFileAsync(string title, string[]? filters)`
   - `Task<string?> SaveFileAsync(string title, string suggestedFileName)`
@@ -1164,78 +1197,153 @@ Create a test project: `dotnet new xunit -n Artemis.Tests -o Tests --framework n
 
 When debugging interoperability issues, compare implementations across all platforms:
 
-| Component | Kotlin (Android) | Web (Browser) | Desktop (C#) |
-|-----------|----------|------|---------|
-| Constants | `Kotlin/.../CryptoConstants.kt` | `Web/wwwroot/js/crypto/crypto-constants.js` | `Core/Cryptography/CryptoConstants.cs` |
-| Key Derivation | `Kotlin/.../PasswordKeyManager.kt` | `Web/wwwroot/js/crypto/argon2-worker.js` | `Core/Cryptography/KeyDerivationService.cs` |
-| Encryption | `Kotlin/.../EncryptionManager.kt` | `Web/wwwroot/js/crypto/crypto-core.js` | `Core/Cryptography/EncryptionService.cs` |
-| File Handling | Android FileProvider | `Web/wwwroot/js/crypto/file-handler.js` | Avalonia StorageProvider |
+| Component      | Kotlin (Android)                   | Web (Browser)                               | Desktop (C#)                                |
+| -------------- | ---------------------------------- | ------------------------------------------- | ------------------------------------------- |
+| Constants      | `Kotlin/.../CryptoConstants.kt`    | `Web/wwwroot/js/crypto/crypto-constants.js` | `Core/Cryptography/CryptoConstants.cs`      |
+| Key Derivation | `Kotlin/.../PasswordKeyManager.kt` | `Web/wwwroot/js/crypto/argon2-worker.js`    | `Core/Cryptography/KeyDerivationService.cs` |
+| Encryption     | `Kotlin/.../EncryptionManager.kt`  | `Web/wwwroot/js/crypto/crypto-core.js`      | `Core/Cryptography/EncryptionService.cs`    |
+| File Handling  | Android FileProvider               | `Web/wwwroot/js/crypto/file-handler.js`     | Avalonia StorageProvider                    |
 
 ---
 
 # Reference: Key Documentation Links
 
-| Topic | URL |
-|-------|-----|
-| AesGcm Class | https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.aesgcm |
-| Cross-Platform Crypto | https://learn.microsoft.com/en-us/dotnet/standard/security/cross-platform-cryptography |
-| Konscious Argon2 | https://github.com/kmaragon/Konscious.Security.Cryptography |
-| AES-GCM in .NET (Scott Brady) | https://www.scottbrady.io/c-sharp/aes-gcm-dotnet |
-| Avalonia Getting Started | https://docs.avaloniaui.net/docs/get-started/ |
-| Avalonia MVVM Pattern | https://docs.avaloniaui.net/docs/concepts/the-mvvm-pattern/ |
-| Avalonia Data Binding | https://docs.avaloniaui.net/docs/basics/data/data-binding/ |
-| Avalonia File Picker | https://docs.avaloniaui.net/docs/concepts/services/storage-provider/file-picker |
-| CommunityToolkit.Mvvm | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/ |
-| [ObservableProperty] | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty |
-| [RelayCommand] | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/relaycommand |
+| Topic                         | URL                                                                                          |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| AesGcm Class                  | https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.aesgcm             |
+| Cross-Platform Crypto         | https://learn.microsoft.com/en-us/dotnet/standard/security/cross-platform-cryptography       |
+| Konscious Argon2              | https://github.com/kmaragon/Konscious.Security.Cryptography                                  |
+| AES-GCM in .NET (Scott Brady) | https://www.scottbrady.io/c-sharp/aes-gcm-dotnet                                             |
+| Avalonia Getting Started      | https://docs.avaloniaui.net/docs/get-started/                                                |
+| Avalonia MVVM Pattern         | https://docs.avaloniaui.net/docs/concepts/the-mvvm-pattern/                                  |
+| Avalonia Data Binding         | https://docs.avaloniaui.net/docs/basics/data/data-binding/                                   |
+| Avalonia File Picker          | https://docs.avaloniaui.net/docs/concepts/services/storage-provider/file-picker              |
+| CommunityToolkit.Mvvm         | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/                              |
+| [ObservableProperty]          | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/observableproperty |
+| [RelayCommand]                | https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/generators/relaycommand       |
 
 ---
 
 # Refactor: Memory Efficiency with Span and Stream
 
-## Why Refactor?
+# Phase 4: Chunked AES-GCM Refactor (Streaming AEAD)
 
-The current implementation uses `File.ReadAllBytesAsync()`, which loads the entire file into a single `byte[]` in memory. While functional for small files, this has drawbacks for a professional desktop app:
+## Overview
 
-1.  **Memory Fragmentation:** Large files (>85KB) are allocated on the **Large Object Heap (LOH)**. Frequent allocations here lead to memory fragmentation and high Garbage Collector (GC) pressure.
-2.  **Scalability:** Attempting to encrypt a 1GB file would require 1GB of contiguous RAM, likely causing an `OutOfMemoryException`.
-3.  **UI Responsiveness:** Moving massive arrays across the heap can cause micro-stutters in the UI thread.
+To ensure the application is memory-safe and can handle massive files (e.g., gigabyte-sized videos) without crashing, we are upgrading the file format to **Streaming AEAD** (Authenticated Encryption with Associated Data).
 
-## The Solution: Span and Stream
+Instead of loading an entire file into memory and encrypting it as a single block (which risks `OutOfMemoryException` and Garbage Collector lag), we process the file in consistent 64KB chunks using `Stream`. Each chunk is encrypted independently with its own IV and Authentication Tag.
 
-### 1. Span<T> and ReadOnlySpan<T>
-`Span<byte>` is a stack-allocated view into memory. It allows for "slicing" (extracting salt, IV, and ciphertext) without creating copies.
-- **Benefit:** Zero-copy operations. We can point to the salt inside a buffer without allocating a new `byte[]`.
-- **Modern API:** .NET's `AesGcm` class natively accepts `ReadOnlySpan<byte>`, which is the most efficient way to interact with cryptographic primitives.
+**Note on Interoperability:** Because this changes the byte structure of the `.enc` files, the Kotlin (Android) and Web apps must also be updated to implement this exact chunked reading/writing logic to maintain cross-platform compatibility.
 
-### 2. Stream-Based Processing
-Instead of loading the file into memory, use `FileStream` to process data in chunks.
-- **Benefit:** Constant memory footprint. Whether the file is 10KB or 10GB, the application only uses a small, fixed buffer (e.g., 64KB).
-- **Async Efficiency:** Streams allow the OS to handle I/O while the CPU handles encryption in parallel.
+---
 
-## Refactor Strategy
+## The New Chunked File Format
 
-### Step 1: Update IEncryptionService
-Change method signatures to support `Stream` or `ReadOnlySpan<byte>`.
+```text
++---------------------------------------------------------------+
+| Global Header:                                                |
+| Offset 0-15:  Global Salt (16 bytes, for Argon2)              |
++---------------------------------------------------------------+
+| Chunk 1:                                                      |
+| Offset 16-27: IV (12 bytes, random for this chunk)            |
+| Offset 28-N:  Ciphertext (up to 65,536 bytes / 64KB)          |
+| Last 16:      Authentication Tag (16 bytes, for this chunk)   |
++---------------------------------------------------------------+
+| Chunk 2 (if file > 64KB):                                     |
+| [IV (12 bytes)] + [Ciphertext (64KB)] + [Tag (16 bytes)]      |
++---------------------------------------------------------------+
+| Final Chunk:                                                  |
+| [IV (12 bytes)] + [Remaining Ciphertext] + [Tag (16 bytes)]   |
++---------------------------------------------------------------+
+```
+
+## Step 4.1: Update CryptoConstants.cs
+
+Path: `Core/Cryptography/CryptoConstants.cs`
+
+What to add:
+Add a new constant for the chunk size. 64KB is the industry standard for streaming encryption (used by tools like age).
 
 ```csharp
+// ─────────────────────────────────────────────
+// Streaming Configuration
+// ─────────────────────────────────────────────
+public const int ChunkSizeBytes = 65536; // 64 KB
+```
+
+## Step 4.2: Update IEncryptionService.cs
+
+**Path:** `Core/Interfaces/IEncryptionService.cs`
+
+**Purpose:** Change the contract to use Stream instead of byte[]. This forces the application to read/write directly from the disk, keeping the memory footprint perfectly flat.
+
+Code Shell:
+
+```Csharp
+namespace Artemis.Core.Interfaces;
+
 public interface IEncryptionService
 {
-    // Encrypts from a source stream to a destination stream
-    Task EncryptAsync(Stream source, Stream destination, char[] password);
+    /// <summary>
+    /// Encrypts data from a source stream and writes it to a destination stream in 64KB chunks.
+    /// </summary>
+    Task EncryptAsync(Stream source, Stream destination, string password);
+
+    /// <summary>
+    /// Decrypts a chunked encrypted stream back to plaintext and writes to the destination.
+    /// Throws if password is wrong or any chunk is corrupted.
+    /// </summary>
+    Task DecryptAsync(Stream source, Stream destination, string password);
 }
 ```
 
-### Step 2: Zero-Copy Parsing
-Instead of `Buffer.BlockCopy`, use Span slicing for header extraction:
+## Step 4.3: Implement Chunked EncryptAsync
 
-```csharp
-// Modern approach (Zero Copy)
-ReadOnlySpan<byte> data = /* from buffer */;
-var salt = data.Slice(0, 16);
-var iv = data.Slice(16, 12);
-```
+**Path:** `Core/Cryptography/EncryptionService.cs`
 
-### Step 3: ViewModel Updates
-Replace `File.ReadAllBytesAsync` with `File.OpenRead`. This ensures that even for massive files, the UI remains fluid and memory usage stays low.
+**Logic:**
 
+1. Generate the Global Salt (16 bytes) and write it immediately to the destination stream.
+
+2. Derive the AES key using the password and the Global Salt.
+
+3. Allocate a single reusable 64KB byte[] buffer for reading plaintext.
+
+4. Open a while loop that reads from the source stream into the buffer.
+
+5. For each chunk read:
+   - Generate a new random IV (12 bytes) and write it to destination.
+
+   - Encrypt the chunk using AesGcm (using ReadOnlySpan for zero-copy efficiency).
+
+   - Write the resulting ciphertext to destination.
+
+   - Write the resulting Authentication Tag (16 bytes) to destination.
+
+   - Loop until source.ReadAsync returns 0 bytes.
+
+## Step 4.4: Implement Chunked DecryptAsync
+
+Path: `Core/Cryptography/EncryptionService.cs`
+
+Logic:
+
+1. Read the first 16 bytes from the source stream to extract the Global Salt.
+
+2. Derive the AES key using the password and the extracted Global Salt.
+
+3. Open a while loop to process chunks until the end of the stream.
+
+4. For each chunk:
+   - Read 12 bytes to extract the IV. If end of stream, break loop.
+
+- Calculate how much ciphertext to read. Note: You'll need logic to determine the chunk size. _Because chunks are max 64KB, you read up to (64KB + 16 bytes tag)._
+
+- Read the ciphertext and the 16-byte Tag.
+
+- Decrypt using AesGcm.Decrypt. **If this throws a CryptographicException, the file is tampered with or the password is wrong.**
+
+- Write the decrypted plaintext chunk directly to the destination stream.
+
+---
