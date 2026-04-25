@@ -115,7 +115,7 @@ public partial class EncryptionViewModel : ViewModelBase
         // Encryption Process
         try
         {
-            double progresStep = 100.0 / SelectedFilePaths!.Count;
+            double progresStep = 100.0 / SelectedFilePaths.Count;
             double currentProgress = 0;
 
             foreach (var filePath in SelectedFilePaths)
@@ -161,7 +161,7 @@ public partial class EncryptionViewModel : ViewModelBase
             CurrentState = OperationState.Faulted;
 
             // Critical Cleanup: If encryption fails halfway, delete the corrupted destination file.
-            if (!string.IsNullOrEmpty(currentSavePath) && File.Exists(currentSavePath))
+            if (!string.IsNullOrWhiteSpace(currentSavePath) && File.Exists(currentSavePath))
             {
                 File.Delete(currentSavePath);
             }
@@ -177,7 +177,7 @@ public partial class EncryptionViewModel : ViewModelBase
     #region Helper Methods
     private static string GenerateOutput(string filePath)
     {
-        return $"{filePath}.enc";
+        return $"{filePath}.{Path.ChangeExtension(filePath, "enc")}";
     }
 
     private void ResetProgressBarState()

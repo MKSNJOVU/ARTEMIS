@@ -17,7 +17,7 @@ public partial class DecryptionViewModel : ViewModelBase
     private readonly IFilePickerService _filePickerService;
     private readonly IDialogService _dialogService;
 
-    // Notice: No byte arrays! Just strings.
+
     [ObservableProperty]
     private string? _selectedFilePath;
 
@@ -97,22 +97,48 @@ public partial class DecryptionViewModel : ViewModelBase
             // 2. Determine the suggested save name. 
             // [YOUR TURN: Since we can't look at the file bytes in memory anymore to guess the extension, 
             // how would you manipulate the SelectedFileName string to remove the ".enc" at the end?]
-            string suggestedFileName = "???";
+
+            string suggestedFileName = GenerateOutput(filePath);
+
 
             // 3. Ask the user where to save it
             savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save Decrypted File");
 
             // [YOUR TURN: What should the UI do if savePath is null or whitespace (meaning the user hit cancel)?]
+            if (string.IsNullOrWhiteSpace(savePath))
+            {
+                CurrentState = OperationState.Faulted;
+                return;
+            }
 
             // [YOUR TURN: What should happen if File.Exists(savePath) is true?]
+            if (File.Exists(savePath))
+            {
+                bool decision = await _dialogService.ShowConfirmationAsync($"The file {Path.GetFileName(savePath)} already exists. Overwrite?");
+                if (decision)
+                {
+                    StatusMessage = "Decrypting file...";
+                    ProgressValue = 50; // Indeterminate progress for streaming 
+                }
+                else
+                {
 
-            StatusMessage = "Decrypting file...";
-            ProgressValue = 50; // Indeterminate progress for streaming
+                    StatusMessage = "Encryption process cancelled.";
+                    CurrentState = OperationState.Idle;
+                    return;
+                }
+            }
 
             // 4. Open the Streams and execute!
             // [YOUR TURN: Open a FileStream for reading the SelectedFilePath]
             // [YOUR TURN: Open a FileStream for writing to the savePath]
             // [YOUR TURN: Pass both streams and the Password to _encryptionService.DecryptAsync]
+
+            using (var sourceStream = new FileStream(suggestedFileName, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var destinationStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password);
+            }
 
             StatusMessage = "Decryption complete!";
             ProgressValue = 100;
@@ -126,6 +152,11 @@ public partial class DecryptionViewModel : ViewModelBase
             // 5. Cleanup the corrupted file
             // [YOUR TURN: The user typed the wrong password, but the destination stream might have written 
             // a few chunks of garbage to the hard drive before crashing. Write the code to delete the savePath file if it exists.]
+
+            if (Path.Exists(savePath))
+            {
+                File.Delete(savePath);
+            }
         }
         catch (Exception e)
         {
@@ -133,6 +164,7 @@ public partial class DecryptionViewModel : ViewModelBase
             CurrentState = OperationState.Faulted;
 
             // [YOUR TURN: Ensure you also clean up the file in this general catch block]
+            ResetState();
         }
         finally
         {
@@ -140,7 +172,7 @@ public partial class DecryptionViewModel : ViewModelBase
             Password = string.Empty;
         }
     }
-
+    #region
     private void ResetState()
     {
         CurrentState = OperationState.Idle;
@@ -149,4 +181,11 @@ public partial class DecryptionViewModel : ViewModelBase
         StatusMessage = string.Empty;
         ErrorMessage = null;
     }
+
+    private static string GenerateOutput(string filePath)
+    {
+        return $"{filePath}.{Path.ChangeExtension(filePath, Path.)}";
+    }
+
+    #endregion
 }
