@@ -184,7 +184,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     private static string GenerateOutput(string filePath)
     {
-        return $"{filePath}.{Path.ChangeExtension(filePath, Path.)}";
+        return $"{filePath}.{Path.ChangeExtension(filePath, Path.GetExtension(filePath))}";
     }
 
     #endregion
