@@ -98,7 +98,7 @@ public partial class DecryptionViewModel : ViewModelBase
             // [YOUR TURN: Since we can't look at the file bytes in memory anymore to guess the extension, 
             // how would you manipulate the SelectedFileName string to remove the ".enc" at the end?]
 
-            string suggestedFileName = GenerateOutput(filePath);
+            string suggestedFileName = GenerateOutput(savePath);
 
 
             // 3. Ask the user where to save it
