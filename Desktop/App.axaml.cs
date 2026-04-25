@@ -1,26 +1,20 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core.Plugins;
-using System.Linq;
-using Avalonia.Markup.Xaml;
-using Artemis.Desktop.ViewModels;
-using Artemis.Desktop.Views;
-using Artemis.Desktop.Services;
 using Artemis.Core.Cryptography;
 using Artemis.Core.Interfaces;
+using Artemis.Desktop.Services;
+using Artemis.Desktop.Services.Interfaces;
+using Artemis.Desktop.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using Artemis.Desktop.Services.Interfaces;
 
 namespace Artemis.Desktop;
 
-public partial class App : Application
+public partial class App
 {
     public static IServiceProvider Services { get; private set; } = null!;
 
     public override void Initialize()
     {
-        AvaloniaXamlLoader.Load(this);
+        //AvaloniaXamlLoader.Load(this);
     }
 
     public override void OnFrameworkInitializationCompleted()
@@ -30,25 +24,26 @@ public partial class App : Application
         var serviceProvider = services.BuildServiceProvider();
         Services = serviceProvider;
 
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            DisableAvaloniaDataAnnotationValidation();
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = Services.GetRequiredService<MainWindowViewModel>(),
-            };
+        //if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        //{
+        //    DisableAvaloniaDataAnnotationValidation();
+        //    desktop.MainWindow = new MainWindow
+        //    {
+        //        DataContext = Services.GetRequiredService<MainWindowViewModel>(),
+        //    };
 
-            desktop.Exit += async (_, _) =>
-            {
-                var clipboardService = Services.GetRequiredService<IClipboardService>();
-                await clipboardService.ClearClipboardAsync();
-            };
+        //    desktop.Exit += async (_, _) =>
+        //    {
+        //        var clipboardService = Services.GetRequiredService<IClipboardService>();
+        //        await clipboardService.ClearClipboardAsync();
+        //    };
 
-            desktop.Exit += (_, _) => serviceProvider.Dispose();
-        }
+        //    desktop.Exit += (_, _) => serviceProvider.Dispose();
+        //}
+    }
 
 
-        private static void ConfigureServices(IServiceCollection services)
+    private static void ConfigureServices(IServiceCollection services)
     {
         // Core
         services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
@@ -67,12 +62,12 @@ public partial class App : Application
         services.AddSingleton<MainWindowViewModel>();
     }
 
-    private void DisableAvaloniaDataAnnotationValidation()
-    {
-        var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
+    //private void DisableAvaloniaDataAnnotationValidation()
+    //{
+    //    var dataValidationPluginsToRemove =
+    //        BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
 
-        foreach (var plugin in dataValidationPluginsToRemove)
-            BindingPlugins.DataValidators.Remove(plugin);
-    }
+    //    foreach (var plugin in dataValidationPluginsToRemove)
+    //        BindingPlugins.DataValidators.Remove(plugin);
+    //}
 }

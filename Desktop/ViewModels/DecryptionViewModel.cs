@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 
@@ -27,7 +28,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
-    private string? _password;
+    private SecureString? _password;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -49,7 +50,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     private bool CanDecrypt => !IsDecrypting
         && !string.IsNullOrWhiteSpace(SelectedFilePath)
-        && !string.IsNullOrEmpty(Password);
+        && Password.Length > 0;
 
     private bool CanSelectFile => !IsDecrypting;
 
@@ -169,7 +170,7 @@ public partial class DecryptionViewModel : ViewModelBase
         finally
         {
             IsDecrypting = false;
-            Password = string.Empty;
+            Password.Clear();
         }
     }
     #region

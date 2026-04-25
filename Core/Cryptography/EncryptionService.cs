@@ -1,5 +1,6 @@
 using Artemis.Core.Interfaces;
 using System.Buffers;
+using System.Security;
 using System.Security.Cryptography;
 namespace Artemis.Core.Cryptography;
 
@@ -21,7 +22,7 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task EncryptAsync(Stream source, Stream destination, string password)
+    public async Task EncryptAsync(Stream source, Stream destination, SecureString password)
     {
         // Generate and Write the Global Salt (Header)
         var randomSalt = new byte[CryptoConstants.SaltSize];
@@ -101,7 +102,7 @@ public class EncryptionService : IEncryptionService
     }
 
 
-    public async Task DecryptAsync(Stream source, Stream destination, string password)
+    public async Task DecryptAsync(Stream source, Stream destination, SecureString password)
     {
         // Prepare and read the Global Salt (Header)
         var extractedSALT = new byte[CryptoConstants.SaltSize];

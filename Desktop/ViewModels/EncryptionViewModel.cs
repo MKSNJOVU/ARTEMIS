@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security;
 using System.Threading.Tasks;
 
 namespace Artemis.Desktop.ViewModels;
@@ -26,10 +27,10 @@ public partial class EncryptionViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private string? _password;
+    private SecureString? _password;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private string? _passwordConfirm;
+    private SecureString? _passwordConfirm;
 
     [ObservableProperty]
     private string? _passwordError;
@@ -50,8 +51,8 @@ public partial class EncryptionViewModel : ViewModelBase
     private OperationState _currentState = OperationState.Idle;
     private bool CanEncrypt => !IsEncrypting
     && SelectedFilePaths is not null
-    && !string.IsNullOrWhiteSpace(Password)
-    && Password == PasswordConfirm;
+    && Password.Length > 0
+    && Password.Equals(PasswordConfirm);
     private bool CanSelectFile => !IsEncrypting;
     #endregion
 
@@ -143,7 +144,7 @@ public partial class EncryptionViewModel : ViewModelBase
                 using (var sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var destinationStream = new FileStream(currentSavePath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    await _encryptionService.EncryptAsync(sourceStream, destinationStream, Password!);
+                    await _encryptionService.EncryptAsync(sourceStream, destinationStream, Password);
                 }
 
                 currentProgress += progresStep;
@@ -192,8 +193,8 @@ public partial class EncryptionViewModel : ViewModelBase
     private void ResetEncryptionState()
     {
         IsEncrypting = false;
-        Password = string.Empty;
-        PasswordConfirm = string.Empty;
+        Password.Clear();
+        PasswordConfirm.Clear();
     }
     #endregion
 }
