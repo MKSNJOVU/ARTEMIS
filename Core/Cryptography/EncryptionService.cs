@@ -2,6 +2,7 @@ using Artemis.Core.Interfaces;
 using System.Buffers;
 using System.Security;
 using System.Security.Cryptography;
+using System.Text;
 namespace Artemis.Core.Cryptography;
 
 public class EncryptionService : IEncryptionService
@@ -22,7 +23,7 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task EncryptAsync(Stream source, Stream destination, SecureString password)
+    public async Task EncryptAsync(Stream source, Stream destination, SecureString password, string associatedData)
     {
         // Generate and Write the Global Salt (Header)
         var randomSalt = new byte[CryptoConstants.SaltSize];
@@ -46,6 +47,11 @@ public class EncryptionService : IEncryptionService
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
                 byte[] lengthBuffer = new byte[sizeof(int)]; // 4 bytes to hold the chunk length
 
+                byte[] pathBytes = Encoding.UTF8.GetBytes(associatedData);
+                byte[] aadBytes = new byte[sizeof(int) + pathBytes.Length];
+
+                Buffer.BlockCopy(pathBytes, 0, aadBytes, sizeof(int), pathBytes.Length);
+
                 int bytesRead = 0;
                 int chunkIndex = 0; // 4. INTEGRITY: Keep track of which chunk we are on
 
@@ -58,7 +64,8 @@ public class EncryptionService : IEncryptionService
                     RandomNumberGenerator.Fill(ivBuffer);
 
                     // Convert our chunkIndex into bytes for the AAD (Reordering Shield)
-                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
+                    byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
+                    Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
                     // Slice our rented buffers to the exact size of the data we just read
                     var plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
@@ -102,7 +109,7 @@ public class EncryptionService : IEncryptionService
     }
 
 
-    public async Task DecryptAsync(Stream source, Stream destination, SecureString password)
+    public async Task DecryptAsync(Stream source, Stream destination, SecureString password, string associatedData)
     {
         // Prepare and read the Global Salt (Header)
         var extractedSALT = new byte[CryptoConstants.SaltSize];
@@ -122,6 +129,11 @@ public class EncryptionService : IEncryptionService
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
                 byte[] lengthBuffer = new byte[sizeof(int)];
 
+                byte[] pathBytes = Encoding.UTF8.GetBytes(associatedData);
+                byte[] aadBytes = new byte[sizeof(int) + pathBytes.Length];
+
+                Buffer.BlockCopy(pathBytes, 0, aadBytes, sizeof(int), pathBytes.Length);
+
                 int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
 
                 // THE RADAR: Read the 4-byte chunk length.
@@ -132,7 +144,7 @@ public class EncryptionService : IEncryptionService
                 {
                     // If we read some bytes but not exactly 4, the file is corrupted/cut off
                     if (lengthBytesRead != sizeof(int))
-                        throw new CryptographicException("Corrupted file: Missing chunk length header.");
+                        throw new CryptographicException("An error occurred");
 
                     // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
                     int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);
@@ -146,7 +158,8 @@ public class EncryptionService : IEncryptionService
 
                     // PREPARE THE SPANS & AAD
 
-                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
+                    byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
+                    Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
                     var cipherText = new ReadOnlySpan<byte>(cipherTextBuffer, 0, currentCiphertextLength);
 

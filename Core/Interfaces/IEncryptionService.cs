@@ -11,7 +11,7 @@ public interface IEncryptionService
     /// <param name="destinationFile"></param>
     /// <param name="password"></param>
     /// <returns>byte[]</returns>
-    Task EncryptAsync(Stream sourceFile, Stream destinationFile, SecureString password);
+    Task EncryptAsync(Stream sourceFile, Stream destinationFile, SecureString password, string associatedData);
 
     /// <summary>
     /// Decrypts data. Throws if password is wrong or data is corrupted.
@@ -20,5 +20,5 @@ public interface IEncryptionService
     /// <param name="destinationFile"></param>
     /// <param name="password"></param>
     /// <returns>oplaintext</returns>
-    Task DecryptAsync(Stream sourceFile, Stream destinationFile, SecureString password);
+    Task DecryptAsync(Stream sourceFile, Stream destinationFile, SecureString password, string associatedData);
 }

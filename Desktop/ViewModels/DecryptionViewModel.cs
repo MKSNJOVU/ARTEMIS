@@ -138,7 +138,7 @@ public partial class DecryptionViewModel : ViewModelBase
             using (var sourceStream = new FileStream(suggestedFileName, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (var destinationStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password);
+                await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password, relativeFilePath);
             }
 
             StatusMessage = "Decryption complete!";
