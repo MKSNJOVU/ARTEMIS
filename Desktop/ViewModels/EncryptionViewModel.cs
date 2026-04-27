@@ -123,7 +123,8 @@ public partial class EncryptionViewModel : ViewModelBase
             {
                 string fileName = Path.GetFileName(filePath);
                 currentSavePath = GenerateOutput(fileName);
-                string relativeFilePath = Path.GetRelativePath(filePath, currentSavePath);
+                string associatedData = Path.GetExtension(fileName);
+
                 // Checking for similar encrypted file to prevent overwriting
                 if (File.Exists(currentSavePath))
                 {
@@ -144,7 +145,7 @@ public partial class EncryptionViewModel : ViewModelBase
                 using (var sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
                 using (var destinationStream = new FileStream(currentSavePath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
-                    await _encryptionService.EncryptAsync(sourceStream, destinationStream, Password, relativeFilePath);
+                    await _encryptionService.EncryptAsync(sourceStream, destinationStream, Password, associatedData);
                 }
 
                 currentProgress += progresStep;

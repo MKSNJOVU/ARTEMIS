@@ -1,3 +1,4 @@
+using Artemis.Core.Cryptography;
 using Artemis.Core.Interfaces;
 using Artemis.Desktop.Models;
 using Artemis.Desktop.Services;
@@ -62,13 +63,13 @@ public partial class DecryptionViewModel : ViewModelBase
     }
 
     [RelayCommand(CanExecute = nameof(CanSelectFile))]
-    private async Task SelectFile()
+    private async Task<string> SelectFile()
     {
         ResetState();
 
         IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to decrypt");
 
-        if (path is null || path.Count == 0) return;
+        if (path is null || path.Count == 0) return string.Empty;
 
         SelectedFilePath = path[0];
         SelectedFileName = Path.GetFileName(path[0]);
@@ -80,6 +81,8 @@ public partial class DecryptionViewModel : ViewModelBase
             SelectedFileName = null;
             CurrentState = OperationState.Faulted;
         }
+
+        return SelectedFilePath;
     }
 
     [RelayCommand(CanExecute = nameof(CanDecrypt))]
@@ -91,7 +94,7 @@ public partial class DecryptionViewModel : ViewModelBase
         ShowProgress = true;
         CurrentState = OperationState.Processing;
 
-        string? savePath = null;
+        string? savePath = SelectFile().ToString();
 
         try
         {
@@ -99,8 +102,8 @@ public partial class DecryptionViewModel : ViewModelBase
             // [YOUR TURN: Since we can't look at the file bytes in memory anymore to guess the extension, 
             // how would you manipulate the SelectedFileName string to remove the ".enc" at the end?]
 
-            string suggestedFileName = GenerateOutput(savePath);
-
+            string? extension = ExtractFileExtenstionAsync(savePath).ToString();
+            string suggestedFileName = await GenerateOutput(savePath, extension);
 
             // 3. Ask the user where to save it
             savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save Decrypted File");
@@ -138,7 +141,7 @@ public partial class DecryptionViewModel : ViewModelBase
             using (var sourceStream = new FileStream(suggestedFileName, FileMode.Open, FileAccess.Read, FileShare.Read))
             using (var destinationStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password, relativeFilePath);
+                await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password, extension);
             }
 
             StatusMessage = "Decryption complete!";
@@ -183,10 +186,39 @@ public partial class DecryptionViewModel : ViewModelBase
         ErrorMessage = null;
     }
 
-    private static string GenerateOutput(string filePath)
+    private async Task<string> GenerateOutput(string filePath, string extension)
     {
-        return $"{filePath}.{Path.ChangeExtension(filePath, Path.GetExtension(filePath))}";
+        string fileName = Path.GetFileName(filePath);
+        return $"{fileName}.{extension}";
     }
 
+    private async Task<string> ExtractFileExtenstionAsync(string encryptedFile)
+    {
+        using (var source = File.OpenRead(encryptedFile))
+        {
+            source.Position = CryptoConstants.SaltSize;
+
+            var lengthBuffer = new byte[sizeof(int)];
+            int bytesRead = await source.ReadAsync(lengthBuffer);
+
+            if (bytesRead < sizeof(int))
+            {
+                return string.Empty;
+            }
+
+            int extensionLength = BitConverter.ToInt32(lengthBuffer);
+
+            if (extensionLength <= 0 || extensionLength > 256)
+            {
+                return string.Empty;
+            }
+
+            var extensionBytes = new byte[extensionLength];
+            await source.ReadExactlyAsync(extensionBytes);
+
+            return System.Text.Encoding.UTF8.GetString(extensionBytes);
+
+        }
+    }
     #endregion
 }

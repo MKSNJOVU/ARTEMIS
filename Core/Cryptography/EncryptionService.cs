@@ -30,6 +30,12 @@ public class EncryptionService : IEncryptionService
         RandomNumberGenerator.Fill(randomSalt);
         await destination.WriteAsync(randomSalt);
 
+        byte[] extBytes = Encoding.UTF8.GetBytes(associatedData);
+        byte[] extLengthBytes = BitConverter.GetBytes(extBytes.Length);
+
+        await destination.WriteAsync(extLengthBytes);
+        await destination.WriteAsync(extBytes);
+
         //  Derive the AES key
         var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
 
@@ -47,10 +53,10 @@ public class EncryptionService : IEncryptionService
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
                 byte[] lengthBuffer = new byte[sizeof(int)]; // 4 bytes to hold the chunk length
 
-                byte[] pathBytes = Encoding.UTF8.GetBytes(associatedData);
-                byte[] aadBytes = new byte[sizeof(int) + pathBytes.Length];
+                byte[] fileExtensionBytes = Encoding.UTF8.GetBytes(associatedData);
+                byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
 
-                Buffer.BlockCopy(pathBytes, 0, aadBytes, sizeof(int), pathBytes.Length);
+                Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
 
                 int bytesRead = 0;
                 int chunkIndex = 0; // 4. INTEGRITY: Keep track of which chunk we are on
@@ -111,9 +117,8 @@ public class EncryptionService : IEncryptionService
 
     public async Task DecryptAsync(Stream source, Stream destination, SecureString password, string associatedData)
     {
-        // Prepare and read the Global Salt (Header)
-        var extractedSALT = new byte[CryptoConstants.SaltSize];
-        await source.ReadExactlyAsync(extractedSALT);
+        // Prepare and read the Global Salt and File Extention(Header)
+        var extractedSALT = await ExtractGlobalSALT(source);
 
         // Derive the AES key (Only happens once!)
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
@@ -129,10 +134,10 @@ public class EncryptionService : IEncryptionService
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
                 byte[] lengthBuffer = new byte[sizeof(int)];
 
-                byte[] pathBytes = Encoding.UTF8.GetBytes(associatedData);
-                byte[] aadBytes = new byte[sizeof(int) + pathBytes.Length];
+                byte[] fileExtensionBytes = Encoding.UTF8.GetBytes(associatedData);
+                byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
 
-                Buffer.BlockCopy(pathBytes, 0, aadBytes, sizeof(int), pathBytes.Length);
+                Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
 
                 int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
 
@@ -188,6 +193,14 @@ public class EncryptionService : IEncryptionService
             ArrayPool<byte>.Shared.Return(plainTextBuffer, clearArray: true);
             ArrayPool<byte>.Shared.Return(cipherTextBuffer, clearArray: true);
         }
+    }
+
+    private async Task<byte[]> ExtractGlobalSALT(Stream source)
+    {
+        var extractedSALT = new byte[CryptoConstants.SaltSize];
+        await source.ReadExactlyAsync(extractedSALT);
+
+        return extractedSALT;
     }
     #endregion
 }
