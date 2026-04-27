@@ -6,7 +6,6 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security;
 using System.Threading.Tasks;
 
 namespace Artemis.Desktop.ViewModels;
@@ -27,10 +26,10 @@ public partial class EncryptionViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private SecureString? _password;
+    private byte[]? _password;
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private SecureString? _passwordConfirm;
+    private byte[]? _passwordConfirm;
 
     [ObservableProperty]
     private string? _passwordError;
@@ -194,8 +193,8 @@ public partial class EncryptionViewModel : ViewModelBase
     private void ResetEncryptionState()
     {
         IsEncrypting = false;
-        Password.Clear();
-        PasswordConfirm.Clear();
+        Password = null;
+        PasswordConfirm = null;
     }
     #endregion
 }

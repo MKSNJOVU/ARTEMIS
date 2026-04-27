@@ -7,7 +7,6 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Security;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 
@@ -29,7 +28,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
-    private SecureString? _password;
+    private byte[]? _password;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -173,7 +172,7 @@ public partial class DecryptionViewModel : ViewModelBase
         finally
         {
             IsDecrypting = false;
-            Password.Clear();
+            Password = null;
         }
     }
     #region

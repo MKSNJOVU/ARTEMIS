@@ -1,5 +1,3 @@
-using System.Security;
-
 namespace Artemis.Core.Interfaces;
 
 public interface IKeyDerivationService
@@ -10,5 +8,5 @@ public interface IKeyDerivationService
     /// <param name="password">User's master password</param>
     /// <param name="salt">Random salt (16 bytes)</param>
     /// <returns>32-byte derived key</returns>
-    Task<byte[]> DeriveKeyAsync(SecureString password, byte[] salt);
+    Task<byte[]> DeriveKeyAsync(byte[] password, byte[] salt);
 }
