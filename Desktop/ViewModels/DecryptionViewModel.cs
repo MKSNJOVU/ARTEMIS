@@ -50,6 +50,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     private bool CanDecrypt => !IsDecrypting
         && !string.IsNullOrWhiteSpace(SelectedFilePath)
+        && Password is not null
         && Password.Length > 0;
 
     private bool CanSelectFile => !IsDecrypting;
@@ -79,9 +80,10 @@ public partial class DecryptionViewModel : ViewModelBase
             SelectedFilePath = null;
             SelectedFileName = null;
             CurrentState = OperationState.Faulted;
+            return string.Empty;
         }
 
-        return SelectedFilePath;
+        return SelectedFilePath ?? string.Empty;
     }
 
     [RelayCommand(CanExecute = nameof(CanDecrypt))]
@@ -93,52 +95,45 @@ public partial class DecryptionViewModel : ViewModelBase
         ShowProgress = true;
         CurrentState = OperationState.Processing;
 
-        string? savePath = SelectFile().ToString();
-
+        string? savePath = await SelectFile();
+        string decryptDestination = string.Empty;
         try
         {
             // 2. Determine the suggested save name. 
-            // [YOUR TURN: Since we can't look at the file bytes in memory anymore to guess the extension, 
-            // how would you manipulate the SelectedFileName string to remove the ".enc" at the end?]
-
-            string? extension = ExtractFileExtenstionAsync(savePath).ToString();
+            string? extension = await ExtractFileExtensionAsync(savePath);
             string suggestedFileName = await GenerateOutput(savePath, extension);
 
             // 3. Ask the user where to save it
-            savePath = await _filePickerService.SaveFileAsync(suggestedFileName, "Save Decrypted File");
+            decryptDestination = await _filePickerService.SaveFileAsync(suggestedFileName, "Save Decrypted File");
 
-            // [YOUR TURN: What should the UI do if savePath is null or whitespace (meaning the user hit cancel)?]
-            if (string.IsNullOrWhiteSpace(savePath))
+            if (string.IsNullOrWhiteSpace(decryptDestination))
             {
-                CurrentState = OperationState.Faulted;
+                StatusMessage = "Decryption process cancelled.";
+                CurrentState = OperationState.Idle;
                 return;
             }
 
-            // [YOUR TURN: What should happen if File.Exists(savePath) is true?]
-            if (File.Exists(savePath))
+
+            if (File.Exists(decryptDestination))
             {
                 bool decision = await _dialogService.ShowConfirmationAsync($"The file {Path.GetFileName(savePath)} already exists. Overwrite?");
                 if (decision)
                 {
                     StatusMessage = "Decrypting file...";
-                    ProgressValue = 50; // Indeterminate progress for streaming 
+                    ProgressValue = 50;
                 }
                 else
                 {
 
-                    StatusMessage = "Encryption process cancelled.";
+                    StatusMessage = "Decryption process cancelled.";
                     CurrentState = OperationState.Idle;
                     return;
                 }
             }
 
             // 4. Open the Streams and execute!
-            // [YOUR TURN: Open a FileStream for reading the SelectedFilePath]
-            // [YOUR TURN: Open a FileStream for writing to the savePath]
-            // [YOUR TURN: Pass both streams and the Password to _encryptionService.DecryptAsync]
-
-            using (var sourceStream = new FileStream(suggestedFileName, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var destinationStream = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (var sourceStream = new FileStream(savePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (var destinationStream = new FileStream(decryptDestination, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password, extension);
             }
@@ -153,12 +148,9 @@ public partial class DecryptionViewModel : ViewModelBase
             CurrentState = OperationState.Faulted;
 
             // 5. Cleanup the corrupted file
-            // [YOUR TURN: The user typed the wrong password, but the destination stream might have written 
-            // a few chunks of garbage to the hard drive before crashing. Write the code to delete the savePath file if it exists.]
-
-            if (Path.Exists(savePath))
+            if (Path.Exists(decryptDestination))
             {
-                File.Delete(savePath);
+                File.Delete(decryptDestination);
             }
         }
         catch (Exception e)
@@ -166,12 +158,16 @@ public partial class DecryptionViewModel : ViewModelBase
             ErrorMessage = $"An error occurred: {e.Message}";
             CurrentState = OperationState.Faulted;
 
-            // [YOUR TURN: Ensure you also clean up the file in this general catch block]
-            ResetState();
+            if (Path.Exists(decryptDestination))
+            {
+                File.Delete(decryptDestination);
+            }
         }
         finally
         {
+            CryptographicOperations.ZeroMemory(Password);
             IsDecrypting = false;
+            ResetState();
             Password = null;
         }
     }
@@ -188,36 +184,28 @@ public partial class DecryptionViewModel : ViewModelBase
     private async Task<string> GenerateOutput(string filePath, string extension)
     {
         string fileName = Path.GetFileName(filePath);
-        return $"{fileName}.{extension}";
+        string fileOutput = Path.ChangeExtension(fileName, extension);
+        return fileOutput;
     }
 
-    private async Task<string> ExtractFileExtenstionAsync(string encryptedFile)
+    private async Task<string> ExtractFileExtensionAsync(string encryptedFile)
     {
-        using (var source = File.OpenRead(encryptedFile))
-        {
-            source.Position = CryptoConstants.SaltSize;
+        using var source = File.OpenRead(encryptedFile);
+        source.Position = CryptoConstants.SaltSize;
 
-            var lengthBuffer = new byte[sizeof(int)];
-            int bytesRead = await source.ReadAsync(lengthBuffer);
+        var lengthBuffer = new byte[sizeof(int)];
+        int bytesRead = await source.ReadAsync(lengthBuffer);
 
-            if (bytesRead < sizeof(int))
-            {
-                return string.Empty;
-            }
+        if (bytesRead < sizeof(int)) return string.Empty;
 
-            int extensionLength = BitConverter.ToInt32(lengthBuffer);
+        int extensionLength = BitConverter.ToInt32(lengthBuffer);
 
-            if (extensionLength <= 0 || extensionLength > 256)
-            {
-                return string.Empty;
-            }
+        if (extensionLength <= 0 || extensionLength > 256) return string.Empty;
 
-            var extensionBytes = new byte[extensionLength];
-            await source.ReadExactlyAsync(extensionBytes);
+        var extensionBytes = new byte[extensionLength];
+        await source.ReadExactlyAsync(extensionBytes);
 
-            return System.Text.Encoding.UTF8.GetString(extensionBytes);
-
-        }
+        return System.Text.Encoding.UTF8.GetString(extensionBytes);
     }
     #endregion
 }
