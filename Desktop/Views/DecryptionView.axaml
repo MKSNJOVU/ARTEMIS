@@ -30,7 +30,7 @@
         <StackPanel Spacing="8">
             <TextBlock Text="Password" />
             <TextBox PasswordChar="*"
-                     services:SecurityHelper.SecurePassword="{Binding PasswordBuffer, Mode=TwoWay}"
+                     services:SecurityHelper.SecurePassword="{Binding Password, Mode=TwoWay}"
                      Watermark="Enter password" />
         </StackPanel>
 

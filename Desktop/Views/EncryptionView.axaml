@@ -30,12 +30,12 @@
         <StackPanel Spacing="8">
             <TextBlock Text="Password" />
             <TextBox PasswordChar="*"
-                     services:SecurityHelper.SecurePassword="{Binding PasswordBuffer, Mode=TwoWay}"
+                     services:SecurityHelper.SecurePassword="{Binding Password, Mode=TwoWay}"
                      Watermark="Enter password" />
 
             <TextBlock Text="Confirm Password" />
             <TextBox PasswordChar="*"
-                     services:SecurityHelper.SecurePassword="{Binding PasswordConfirmBuffer, Mode=TwoWay}"
+                     services:SecurityHelper.SecurePassword="{Binding PasswordConfirm, Mode=TwoWay}"
                      Watermark="Confirm password" />
 
             <!-- Password error -->
