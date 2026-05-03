@@ -116,9 +116,15 @@ public class EncryptionService : IEncryptionService
 
     public async Task DecryptAsync(Stream source, Stream destination, byte[] password)
     {
-        // Prepare and read the Global Salt and File Extention(Header)
+        // Prepare and read the Global Salt and File Extension(Header)
         var extractedSALT = await ExtractGlobalSALT(source);
-        var associatedData = null;
+
+        int extensionLength = await ExtractExtensionLength(source);
+
+        byte[] fileExtensionBytes = new byte[extensionLength];
+        await source.ReadExactlyAsync(fileExtensionBytes);
+
+        byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
 
         // Derive the AES key (Only happens once!)
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
@@ -132,10 +138,7 @@ public class EncryptionService : IEncryptionService
             {
                 byte[] ivBuffer = new byte[CryptoConstants.IvSize];
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
-                byte[] lengthBuffer = new byte[sizeof(int)];
-
-                byte[] fileExtensionBytes = Encoding.UTF8.GetBytes(associatedData);
-                byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
+                var lengthBuffer = new byte[sizeof(int)];
 
                 Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
 
@@ -201,6 +204,20 @@ public class EncryptionService : IEncryptionService
         await source.ReadExactlyAsync(extractedSALT);
 
         return extractedSALT;
+    }
+
+    private async Task<int> ExtractExtensionLength(Stream source)
+    {
+        var lengthBuffer = new byte[sizeof(int)];
+        await source.ReadExactlyAsync(lengthBuffer);
+
+
+        int extensionLength = BitConverter.ToInt32(lengthBuffer);
+
+        if (extensionLength <= 0 || extensionLength > 256)
+            throw new CryptographicException("Invalid file header or corrupted extension length.");
+
+        return extensionLength;
     }
     #endregion
 }
