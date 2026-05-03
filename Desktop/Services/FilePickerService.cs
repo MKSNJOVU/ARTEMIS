@@ -36,7 +36,7 @@ public class FilePickerService : IFilePickerService
         return file?.TryGetLocalPath();
     }
 
-    public async Task<IReadOnlyList<string>?> OpenFolderAsync(string title = "Select Folder", bool allowMultiple = false)
+    public async Task<string>? OpenFolderAsync(string title = "Select Folder", bool allowMultiple = false)
     {
         var topLevel = GetTopLevel();
         var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
@@ -44,10 +44,7 @@ public class FilePickerService : IFilePickerService
             AllowMultiple = allowMultiple,
             Title = title
         });
-        return folders?.Count > 0 ? folders
-        .Select(c => c.TryGetLocalPath())
-        .OfType<string>()
-        .ToList() : null;
+        return folders?.Count > 0 ? folders.ToString() : null;
     }
 
     private static Window GetTopLevel()

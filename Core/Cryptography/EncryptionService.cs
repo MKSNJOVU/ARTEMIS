@@ -114,10 +114,11 @@ public class EncryptionService : IEncryptionService
     }
 
 
-    public async Task DecryptAsync(Stream source, Stream destination, byte[] password, string associatedData)
+    public async Task DecryptAsync(Stream source, Stream destination, byte[] password)
     {
         // Prepare and read the Global Salt and File Extention(Header)
         var extractedSALT = await ExtractGlobalSALT(source);
+        var associatedData = null;
 
         // Derive the AES key (Only happens once!)
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
@@ -148,7 +149,7 @@ public class EncryptionService : IEncryptionService
                 {
                     // If we read some bytes but not exactly 4, the file is corrupted/cut off
                     if (lengthBytesRead != sizeof(int))
-                        throw new CryptographicException("An error occurred");
+                        throw new CryptographicException("Error: The file has been corrupted");
 
                     // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
                     int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);

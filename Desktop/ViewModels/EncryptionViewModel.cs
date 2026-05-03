@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 
 namespace Artemis.Desktop.ViewModels;
@@ -50,8 +51,9 @@ public partial class EncryptionViewModel : ViewModelBase
     private OperationState _currentState = OperationState.Idle;
     private bool CanEncrypt => !IsEncrypting
     && SelectedFilePaths is not null
+    && Password is not null
     && Password.Length > 0
-    && Password.Equals(PasswordConfirm);
+    && CryptographicOperations.FixedTimeEquals(Password, PasswordConfirm);
     private bool CanSelectFile => !IsEncrypting;
     #endregion
 
@@ -75,7 +77,7 @@ public partial class EncryptionViewModel : ViewModelBase
         ResetProgressBarState();
 
         // Getting the file path
-        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to encrypt");
+        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file(s) to encrypt", allowMultiple: true);
 
         // Safe return for canceled operation or empty path
         if (path is null || path.Count == 0)
@@ -111,24 +113,29 @@ public partial class EncryptionViewModel : ViewModelBase
         CurrentState = OperationState.Processing;
 
         string? currentSavePath = null;
-
+        string encryptedFileOutput = string.Empty;
         // Encryption Process
         try
         {
             double progresStep = 100.0 / SelectedFilePaths.Count;
             double currentProgress = 0;
 
+            string? location = await _filePickerService.OpenFolderAsync();
+
             foreach (var filePath in SelectedFilePaths)
             {
-                string fileName = Path.GetFileName(filePath);
-                currentSavePath = GenerateOutput(fileName);
+                string fileName = GenerateOutput(Path.GetFileName(filePath));
+
                 string associatedData = Path.GetExtension(fileName);
 
+                currentSavePath = Path.Combine(location, fileName);
+
+                //encryptedFileOutput = Path.GetDirectoryName();
                 // Checking for similar encrypted file to prevent overwriting
                 if (File.Exists(currentSavePath))
                 {
                     bool decision = await _dialogService.ShowConfirmationAsync($"The file {Path.GetFileName(currentSavePath)} already exists. Overwrite?");
-                    if (!decision)
+                    if (decision)
                     {
                         continue;
                     }
@@ -178,7 +185,7 @@ public partial class EncryptionViewModel : ViewModelBase
     #region Helper Methods
     private static string GenerateOutput(string filePath)
     {
-        return $"{filePath}.{Path.ChangeExtension(filePath, "enc")}";
+        return Path.ChangeExtension(filePath, "enc");
     }
 
     private void ResetProgressBarState()
@@ -193,6 +200,8 @@ public partial class EncryptionViewModel : ViewModelBase
     private void ResetEncryptionState()
     {
         IsEncrypting = false;
+        CryptographicOperations.ZeroMemory(Password);
+        CryptographicOperations.ZeroMemory(PasswordConfirm);
         Password = null;
         PasswordConfirm = null;
     }

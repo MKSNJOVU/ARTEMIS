@@ -18,5 +18,5 @@ public interface IEncryptionService
     /// <param name="destinationFile"></param>
     /// <param name="password"></param>
     /// <returns>oplaintext</returns>
-    Task DecryptAsync(Stream sourceFile, Stream destinationFile, byte[] password, string associatedData);
+    Task DecryptAsync(Stream sourceFile, Stream destinationFile, byte[] password);
 }
