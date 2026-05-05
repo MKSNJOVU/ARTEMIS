@@ -60,8 +60,7 @@
 
         <!-- Encrypt button -->
         <Button Content="Encrypt"
-                Command="{Binding EncryptCommand}"
-                IsEnabled="{Binding IsEncrypting}" />
+                Command="{Binding EncryptCommand}" />
 
     </StackPanel>
 </UserControl>

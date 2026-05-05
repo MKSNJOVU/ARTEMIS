@@ -20,9 +20,11 @@ public partial class EncryptionViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
     private List<string>? _selectedFilePaths;
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
     private string? _selectedFileName;
 
     [ObservableProperty]
@@ -52,9 +54,9 @@ public partial class EncryptionViewModel : ViewModelBase
     private bool CanEncrypt => !IsEncrypting
     && SelectedFilePaths is not null
     && SelectedFileName is not null
-    && Password is not null
-    && Password.Length > 0
-    && CryptographicOperations.FixedTimeEquals(Password, PasswordConfirm);
+    && Password?.Length > 0
+    && PasswordConfirm?.Length > 0
+    && IsPasswordValid(Password, PasswordConfirm);
     private bool CanSelectFile => !IsEncrypting;
     #endregion
 
@@ -137,17 +139,11 @@ public partial class EncryptionViewModel : ViewModelBase
                 if (File.Exists(currentSavePath))
                 {
                     bool decision = await _dialogService.ShowConfirmationAsync($"The file {Path.GetFileName(currentSavePath)} already exists. Overwrite?");
-                    if (decision)
+                    if (!decision)
                     {
                         continue;
                     }
-                    else
-                    {
 
-                        StatusMessage = "Encryption process cancelled.";
-                        CurrentState = OperationState.Idle;
-                        return;
-                    }
                 }
 
                 using (var sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
@@ -206,6 +202,16 @@ public partial class EncryptionViewModel : ViewModelBase
         CryptographicOperations.ZeroMemory(PasswordConfirm);
         Password = null;
         PasswordConfirm = null;
+    }
+    public bool IsPasswordValid(byte[] password, byte[] passwordConfirm)
+    {
+        if (password is null || passwordConfirm is null)
+            return false;
+
+        if (password.Length != passwordConfirm.Length)
+            return false;
+
+        return CryptographicOperations.FixedTimeEquals(password, passwordConfirm);
     }
     #endregion
 }
