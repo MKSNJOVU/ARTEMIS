@@ -11,15 +11,17 @@
    
         <DockPanel>
             <!-- Navigation Bar -->
-            <Border DockPanel.Dock="Top" Background="#F3F3F3" Padding="10">
+            <Border DockPanel.Dock="Top" Background="#1E3A5F" Padding="10">
                 <Grid ColumnDefinitions="*, Auto, *">
                     <!-- Navigation Buttons (Centered) -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                        <Button Content="Encrypt" 
+                        <Button Content="Encrypt"
+								Foreground=""
                                 Command="{Binding ShowEncryptCommand}"
                                 Width="100" HorizontalContentAlignment="Center"/>
                         <Button Content="Decrypt" 
                                 Command="{Binding ShowDecryptCommand}"
+								Foreground=""
                                 Width="100" HorizontalContentAlignment="Center"/>
                     </StackPanel>
 

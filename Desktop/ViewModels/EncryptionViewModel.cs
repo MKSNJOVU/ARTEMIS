@@ -51,6 +51,7 @@ public partial class EncryptionViewModel : ViewModelBase
     private OperationState _currentState = OperationState.Idle;
     private bool CanEncrypt => !IsEncrypting
     && SelectedFilePaths is not null
+    && SelectedFileName is not null
     && Password is not null
     && Password.Length > 0
     && CryptographicOperations.FixedTimeEquals(Password, PasswordConfirm);
@@ -72,7 +73,7 @@ public partial class EncryptionViewModel : ViewModelBase
     /// </summary>
     /// <returns>The file name, file path and file bytes of a selected file.</returns>
     [RelayCommand(CanExecute = nameof(CanSelectFile))]
-    private async Task SelectFile()
+    private async Task<string> SelectFile()
     {
         ResetProgressBarState();
 
@@ -81,21 +82,22 @@ public partial class EncryptionViewModel : ViewModelBase
 
         // Safe return for canceled operation or empty path
         if (path is null || path.Count == 0)
-            return;
+            return string.Empty;
 
-        try
-        {
-            // Storing the file details
-            SelectedFilePaths = [.. path];
-            SelectedFileName = Path.GetFileName(path[0]);
-        }
-        catch
+        // Storing the file details
+        SelectedFilePaths = [.. path];
+        SelectedFileName = Path.GetFileName(path[0]);
+
+        if (!Path.Exists(path[0]))
         {
             SelectedFilePaths = null;
             SelectedFileName = null;
             ErrorMessage = "Unable to read the selected file. It may have been moved, deleted, or is in use.";
             CurrentState = OperationState.Faulted;
+            return string.Empty;
         }
+
+        return SelectedFileName ?? string.Empty;
     }
 
 

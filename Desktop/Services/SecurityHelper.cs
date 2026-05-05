@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using System;
 using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace Artemis.Desktop.Services;
 
@@ -15,8 +16,8 @@ public static class SecurityHelper
 {
     private static readonly ConditionalWeakTable<TextBox, IDisposable> _textSubscriptions = new();
 
-    public static readonly AttachedProperty<char[]?> SecurePasswordProperty =
-        AvaloniaProperty.RegisterAttached<TextBox, char[]?>("SecurePassword", typeof(SecurityHelper));
+    public static readonly AttachedProperty<byte[]?> SecurePasswordProperty =
+        AvaloniaProperty.RegisterAttached<TextBox, byte[]?>("SecurePassword", typeof(SecurityHelper));
 
     static SecurityHelper()
     {
@@ -47,12 +48,12 @@ public static class SecurityHelper
 
         var text = textBox.Text;
         // Convert string to char[] and update the bound property
-        var newBuffer = string.IsNullOrEmpty(text) ? null : text.ToCharArray();
+        var newBuffer = string.IsNullOrEmpty(text) ? null : Encoding.UTF8.GetBytes(text);
         SetSecurePassword(textBox, newBuffer);
     }
 
-    public static char[]? GetSecurePassword(TextBox element) => element.GetValue(SecurePasswordProperty);
-    public static void SetSecurePassword(TextBox element, char[]? value) => element.SetValue(SecurePasswordProperty, value);
+    public static byte[]? GetSecurePassword(TextBox element) => element.GetValue(SecurePasswordProperty);
+    public static void SetSecurePassword(TextBox element, byte[]? value) => element.SetValue(SecurePasswordProperty, value);
 
     /// <summary>
     /// Securely clears the system clipboard to prevent sensitive data from persisting.
