@@ -44,7 +44,8 @@ public class FilePickerService : IFilePickerService
             AllowMultiple = allowMultiple,
             Title = title
         });
-        return folders?.Count > 0 ? folders.ToString() : null;
+        string actualPath;
+        return folders?.Count > 0 ? actualPath = folders[0].Path.LocalPath : null;
     }
 
     private static Window GetTopLevel()

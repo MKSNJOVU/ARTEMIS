@@ -29,10 +29,10 @@ public partial class EncryptionViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private byte[]? _password;
+    private byte[]? _password = [];
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private byte[]? _passwordConfirm;
+    private byte[]? _passwordConfirm = [];
 
     [ObservableProperty]
     private string? _passwordError;

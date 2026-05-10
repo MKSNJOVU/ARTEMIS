@@ -20,6 +20,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
 
     [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
     private string? _selectedFilePath;
 
     [ObservableProperty]
@@ -28,7 +29,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(DecryptCommand))]
-    private byte[]? _password;
+    private byte[]? _password = [];
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -50,8 +51,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
     private bool CanDecrypt => !IsDecrypting
         && !string.IsNullOrWhiteSpace(SelectedFilePath)
-        && Password is not null
-        && Password.Length > 0;
+        && Password?.Length > 0;
 
     private bool CanSelectFile => !IsDecrypting;
 
@@ -95,7 +95,7 @@ public partial class DecryptionViewModel : ViewModelBase
         ShowProgress = true;
         CurrentState = OperationState.Processing;
 
-        string? savePath = await SelectFile();
+        string? savePath = SelectedFilePath;
         string decryptDestination = string.Empty;
         try
         {

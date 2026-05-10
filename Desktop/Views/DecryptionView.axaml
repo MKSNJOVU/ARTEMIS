@@ -49,8 +49,7 @@
 
         <!-- Decrypt button -->
         <Button Content="Decrypt"
-                Command="{Binding DecryptCommand}"
-                IsEnabled="{Binding !IsDecrypting}" />
+                Command="{Binding DecryptCommand}" />
 
     </StackPanel>
 </UserControl>
