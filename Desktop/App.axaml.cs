@@ -1,17 +1,14 @@
-using Avalonia;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core.Plugins;
-using System.Linq;
-using Avalonia.Markup.Xaml;
-using Artemis.Desktop.ViewModels;
-using Artemis.Desktop.Views;
-using Artemis.Desktop.Services;
 using Artemis.Core.Cryptography;
 using Artemis.Core.Interfaces;
+using Artemis.Desktop.Services;
+using Artemis.Desktop.Services.Interfaces;
+using Artemis.Desktop.ViewModels;
+using Artemis.Desktop.Views;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using Artemis.Desktop.Services.Interfaces;
-
 namespace Artemis.Desktop;
 
 public partial class App : Application
@@ -32,7 +29,6 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            DisableAvaloniaDataAnnotationValidation();
             desktop.MainWindow = new MainWindow
             {
                 DataContext = Services.GetRequiredService<MainWindowViewModel>(),
@@ -46,9 +42,10 @@ public partial class App : Application
 
             desktop.Exit += (_, _) => serviceProvider.Dispose();
         }
+    }
 
 
-        private static void ConfigureServices(IServiceCollection services)
+    private static void ConfigureServices(IServiceCollection services)
     {
         // Core
         services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
@@ -67,12 +64,4 @@ public partial class App : Application
         services.AddSingleton<MainWindowViewModel>();
     }
 
-    private void DisableAvaloniaDataAnnotationValidation()
-    {
-        var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-        foreach (var plugin in dataValidationPluginsToRemove)
-            BindingPlugins.DataValidators.Remove(plugin);
-    }
 }

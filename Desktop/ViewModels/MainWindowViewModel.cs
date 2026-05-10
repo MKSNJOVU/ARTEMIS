@@ -1,7 +1,10 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Artemis.Desktop.Services.Interfaces;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Threading.Tasks;
+
 namespace Artemis.Desktop.ViewModels;
 
 public partial class MainWindowViewModel : ViewModelBase
@@ -9,7 +12,7 @@ public partial class MainWindowViewModel : ViewModelBase
     #region Private fields
     private readonly IServiceProvider _serviceProvider;
     private readonly IClipboardService _clipboardService;
-    
+
     [ObservableProperty]
     private ViewModelBase? _currentView;
     #endregion

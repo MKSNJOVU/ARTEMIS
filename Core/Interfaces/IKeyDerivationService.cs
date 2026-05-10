@@ -8,5 +8,5 @@ public interface IKeyDerivationService
     /// <param name="password">User's master password</param>
     /// <param name="salt">Random salt (16 bytes)</param>
     /// <returns>32-byte derived key</returns>
-    Task<byte[]> DeriveKeyAsync(string password, byte[] salt);
+    Task<byte[]> DeriveKeyAsync(byte[] password, byte[] salt);
 }

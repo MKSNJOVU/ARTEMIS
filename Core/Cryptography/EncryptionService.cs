@@ -1,6 +1,7 @@
 using Artemis.Core.Interfaces;
 using System.Buffers;
 using System.Security.Cryptography;
+using System.Text;
 namespace Artemis.Core.Cryptography;
 
 public class EncryptionService : IEncryptionService
@@ -21,12 +22,18 @@ public class EncryptionService : IEncryptionService
     #endregion
 
     #region Methods
-    public async Task EncryptAsync(Stream source, Stream destination, string password)
+    public async Task EncryptAsync(Stream source, Stream destination, byte[] password, string associatedData)
     {
         // Generate and Write the Global Salt (Header)
         var randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
         await destination.WriteAsync(randomSalt);
+
+        byte[] extBytes = Encoding.UTF8.GetBytes(associatedData);
+        byte[] extLengthBytes = BitConverter.GetBytes(extBytes.Length);
+
+        await destination.WriteAsync(extLengthBytes);
+        await destination.WriteAsync(extBytes);
 
         //  Derive the AES key
         var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
@@ -45,6 +52,11 @@ public class EncryptionService : IEncryptionService
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
                 byte[] lengthBuffer = new byte[sizeof(int)]; // 4 bytes to hold the chunk length
 
+                byte[] fileExtensionBytes = Encoding.UTF8.GetBytes(associatedData);
+                byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
+
+                Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
+
                 int bytesRead = 0;
                 int chunkIndex = 0; // 4. INTEGRITY: Keep track of which chunk we are on
 
@@ -57,7 +69,8 @@ public class EncryptionService : IEncryptionService
                     RandomNumberGenerator.Fill(ivBuffer);
 
                     // Convert our chunkIndex into bytes for the AAD (Reordering Shield)
-                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
+                    byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
+                    Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
                     // Slice our rented buffers to the exact size of the data we just read
                     var plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
@@ -101,11 +114,17 @@ public class EncryptionService : IEncryptionService
     }
 
 
-    public async Task DecryptAsync(Stream source, Stream destination, string password)
+    public async Task DecryptAsync(Stream source, Stream destination, byte[] password)
     {
-        // Prepare and read the Global Salt (Header)
-        var extractedSALT = new byte[CryptoConstants.SaltSize];
-        await source.ReadExactlyAsync(extractedSALT);
+        // Prepare and read the Global Salt and File Extension(Header)
+        var extractedSALT = await ExtractGlobalSALT(source);
+
+        int extensionLength = await ExtractExtensionLength(source);
+
+        byte[] fileExtensionBytes = new byte[extensionLength];
+        await source.ReadExactlyAsync(fileExtensionBytes);
+
+        byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
 
         // Derive the AES key (Only happens once!)
         var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
@@ -119,7 +138,9 @@ public class EncryptionService : IEncryptionService
             {
                 byte[] ivBuffer = new byte[CryptoConstants.IvSize];
                 byte[] tagBuffer = new byte[CryptoConstants.TagSize];
-                byte[] lengthBuffer = new byte[sizeof(int)];
+                var lengthBuffer = new byte[sizeof(int)];
+
+                Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
 
                 int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
 
@@ -131,7 +152,7 @@ public class EncryptionService : IEncryptionService
                 {
                     // If we read some bytes but not exactly 4, the file is corrupted/cut off
                     if (lengthBytesRead != sizeof(int))
-                        throw new CryptographicException("Corrupted file: Missing chunk length header.");
+                        throw new CryptographicException("Error: The file has been corrupted");
 
                     // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
                     int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);
@@ -145,7 +166,8 @@ public class EncryptionService : IEncryptionService
 
                     // PREPARE THE SPANS & AAD
 
-                    byte[] aadBytes = BitConverter.GetBytes(chunkIndex);
+                    byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
+                    Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
                     var cipherText = new ReadOnlySpan<byte>(cipherTextBuffer, 0, currentCiphertextLength);
 
@@ -174,6 +196,28 @@ public class EncryptionService : IEncryptionService
             ArrayPool<byte>.Shared.Return(plainTextBuffer, clearArray: true);
             ArrayPool<byte>.Shared.Return(cipherTextBuffer, clearArray: true);
         }
+    }
+
+    private async Task<byte[]> ExtractGlobalSALT(Stream source)
+    {
+        var extractedSALT = new byte[CryptoConstants.SaltSize];
+        await source.ReadExactlyAsync(extractedSALT);
+
+        return extractedSALT;
+    }
+
+    private async Task<int> ExtractExtensionLength(Stream source)
+    {
+        var lengthBuffer = new byte[sizeof(int)];
+        await source.ReadExactlyAsync(lengthBuffer);
+
+
+        int extensionLength = BitConverter.ToInt32(lengthBuffer);
+
+        if (extensionLength <= 0 || extensionLength > 256)
+            throw new CryptographicException("Invalid file header or corrupted extension length.");
+
+        return extensionLength;
     }
     #endregion
 }

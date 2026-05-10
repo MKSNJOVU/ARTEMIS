@@ -1,13 +1,13 @@
 using Artemis.Core.Interfaces;
+using Artemis.Desktop.Models;
+using Artemis.Desktop.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Artemis.Desktop.Services;
-using System.IO;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
 using System;
-using Artemis.Desktop.Models;
+using System.Collections.Generic;
+using System.IO;
+using System.Security.Cryptography;
+using System.Threading.Tasks;
 
 namespace Artemis.Desktop.ViewModels;
 
@@ -20,17 +20,20 @@ public partial class EncryptionViewModel : ViewModelBase
     private readonly IDialogService _dialogService;
 
     [ObservableProperty]
-    private List<string>? _selectedFilePath;
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
+    private List<string>? _selectedFilePaths;
+
     [ObservableProperty]
-    private byte[]? _selectedFileBytes;
-    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
     private string? _selectedFileName;
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private char[]? _passwordBuffer;
+    private byte[]? _password = [];
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand))]
-    private char[]? _passwordConfirmBuffer;
+    private byte[]? _passwordConfirm = [];
+
     [ObservableProperty]
     private string? _passwordError;
     [ObservableProperty]
@@ -49,9 +52,11 @@ public partial class EncryptionViewModel : ViewModelBase
     [ObservableProperty]
     private OperationState _currentState = OperationState.Idle;
     private bool CanEncrypt => !IsEncrypting
-    && SelectedFileBytes is not null
-    && PasswordBuffer?.Length > 0
-    && PasswordBuffer.SequenceEqual(PasswordConfirmBuffer ?? []);
+    && SelectedFilePaths is not null
+    && SelectedFileName is not null
+    && Password?.Length > 0
+    && PasswordConfirm?.Length > 0
+    && IsPasswordValid(Password, PasswordConfirm);
     private bool CanSelectFile => !IsEncrypting;
     #endregion
 
@@ -70,42 +75,31 @@ public partial class EncryptionViewModel : ViewModelBase
     /// </summary>
     /// <returns>The file name, file path and file bytes of a selected file.</returns>
     [RelayCommand(CanExecute = nameof(CanSelectFile))]
-    private async Task SelectFile()
+    private async Task<string> SelectFile()
     {
-        ResetState();
-
-        // Clearing previous errors
-        ErrorMessage = null;
-        PasswordError = null;
-        StatusMessage = null;
+        ResetProgressBarState();
 
         // Getting the file path
-        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file to encrypt");
+        IReadOnlyList<string>? path = await _filePickerService.OpenFileAsync("Select file(s) to encrypt", allowMultiple: true);
 
         // Safe return for canceled operation or empty path
         if (path is null || path.Count == 0)
-            return;
-
-        SelectedFileBytes = null;
-        SelectedFilePath = null;
-        SelectedFileName = null;
+            return string.Empty;
 
         // Storing the file details
-        SelectedFilePath = [.. path];
+        SelectedFilePaths = [.. path];
         SelectedFileName = Path.GetFileName(path[0]);
 
-        try
+        if (!Path.Exists(path[0]))
         {
-            SelectedFileBytes = await File.ReadAllBytesAsync(SelectedFilePath[0]);
-        }
-        catch
-        {
-            SelectedFileBytes = null;
-            SelectedFilePath = null;
+            SelectedFilePaths = null;
             SelectedFileName = null;
             ErrorMessage = "Unable to read the selected file. It may have been moved, deleted, or is in use.";
             CurrentState = OperationState.Faulted;
+            return string.Empty;
         }
+
+        return SelectedFileName ?? string.Empty;
     }
 
 
@@ -116,104 +110,108 @@ public partial class EncryptionViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanEncrypt))]
     private async Task Encrypt()
     {
-
-        // Clearing previous errors
         ErrorMessage = null;
         PasswordError = null;
-
-        // Secure Snapshot: Capture references and clone sensitive data to avoid race conditions and memory leaks.
-        char[]? passwordSnapshot = new char[PasswordBuffer!.Length];
-        Array.Copy(PasswordBuffer, passwordSnapshot, PasswordBuffer.Length);
-        byte[]? fileSnapshot = SelectedFileBytes;
-        byte[]? encryptedBytes = null;
-        // Encryption Process
         IsEncrypting = true;
+        ShowProgress = true;
+        CurrentState = OperationState.Processing;
+
+        string? currentSavePath = null;
+        string encryptedFileOutput = string.Empty;
+        // Encryption Process
         try
         {
-            //Processing data
-            CurrentState = OperationState.Processing;
+            double progresStep = 100.0 / SelectedFilePaths.Count;
+            double currentProgress = 0;
 
-            StatusMessage = "Deriving encryption key...";
-            ProgressValue = 15;
-            encryptedBytes = await _encryptionService.EncryptAsync(fileSnapshot!, passwordSnapshot);
+            string? location = await _filePickerService.OpenFolderAsync();
 
-            //Saving data
-            CurrentState = OperationState.Saving;
-            ProgressValue = 80;
-            StatusMessage = "Saving encrypted file...";
-            var encryptedFile = GenerateOutput(SelectedFileName);
-            var savePath = await _filePickerService.SaveFileAsync(encryptedFile, "Save your file");
-
-            if (string.IsNullOrWhiteSpace(savePath))
+            foreach (var filePath in SelectedFilePaths)
             {
-                StatusMessage = "Encryption process cancelled.";
-                CurrentState = OperationState.Idle;
-                return;
-            }
+                string fileName = GenerateOutput(Path.GetFileName(filePath));
 
-            // Checking for similar encrypted file
-            if (File.Exists(savePath))
-            {
-                bool decision = await _dialogService.ShowConfirmationAsync("A similar file exists. Do you wish to override existing file?");
-                if (!decision)
+                string associatedData = Path.GetExtension(fileName);
+
+                currentSavePath = Path.Combine(location, fileName);
+
+                //encryptedFileOutput = Path.GetDirectoryName();
+                // Checking for similar encrypted file to prevent overwriting
+                if (File.Exists(currentSavePath))
                 {
-                    StatusMessage = "Encryption process cancelled.";
-                    CurrentState = OperationState.Idle;
-                    return;
+                    bool decision = await _dialogService.ShowConfirmationAsync($"The file {Path.GetFileName(currentSavePath)} already exists. Overwrite?");
+                    if (!decision)
+                    {
+                        continue;
+                    }
+
                 }
+
+                using (var sourceStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var destinationStream = new FileStream(currentSavePath, FileMode.Create, FileAccess.Write, FileShare.None))
+                {
+                    await _encryptionService.EncryptAsync(sourceStream, destinationStream, Password, associatedData);
+                }
+
+                currentProgress += progresStep;
+                ProgressValue = currentProgress;
             }
 
             // Save the encrypted output
-            await File.WriteAllBytesAsync(savePath, encryptedBytes);
             ProgressValue = 100;
             StatusMessage = "Encryption complete!";
             CurrentState = OperationState.Completed;
         }
-        catch (FileNotFoundException) // Handling the case of a moved file
+        catch (Exception e)
         {
-            ErrorMessage = "File no longer exists. Please select the file again.";
-            SelectedFilePath = null;
-            SelectedFileName = null;
-            return;
-        }
-        catch (IOException) // Handling the case of an opened file
-        {
-            ErrorMessage = "File is in use by another program. Please close it and try again.";
-            return;
-        }
+            ErrorMessage = $"Encryption failed: {e.Message}";
+            CurrentState = OperationState.Faulted;
 
-        catch (System.Exception e)
-        {
-            ErrorMessage = e.Message;
+            // Critical Cleanup: If encryption fails halfway, delete the corrupted destination file.
+            if (!string.IsNullOrWhiteSpace(currentSavePath) && File.Exists(currentSavePath))
+            {
+                File.Delete(currentSavePath);
+            }
         }
         finally
         {
-            if (passwordSnapshot is not null) Array.Clear(passwordSnapshot, 0, passwordSnapshot.Length);
-            if (encryptedBytes is not null) Array.Clear(encryptedBytes, 0, encryptedBytes.Length);
-
-            // Clear properties and confirm buffers
-            if (PasswordBuffer is not null) Array.Clear(PasswordBuffer, 0, PasswordBuffer.Length);
-            if (PasswordConfirmBuffer is not null) Array.Clear(PasswordConfirmBuffer, 0, PasswordConfirmBuffer.Length);
-            if (SelectedFileBytes is not null) Array.Clear(SelectedFileBytes, 0, SelectedFileBytes.Length);
-
-            IsEncrypting = false;
+            ResetEncryptionState();
         }
+
     }
     #endregion
 
     #region Helper Methods
-    private static string GenerateOutput(string? file)
+    private static string GenerateOutput(string filePath)
     {
-        return $"{file}.enc";
+        return Path.ChangeExtension(filePath, "enc");
     }
 
-    private void ResetState()
+    private void ResetProgressBarState()
     {
         CurrentState = OperationState.Idle;
         ShowProgress = false;
         ProgressValue = 0;
         StatusMessage = string.Empty;
         ErrorMessage = null;
+    }
+
+    private void ResetEncryptionState()
+    {
+        IsEncrypting = false;
+        CryptographicOperations.ZeroMemory(Password);
+        CryptographicOperations.ZeroMemory(PasswordConfirm);
+        Password = null;
+        PasswordConfirm = null;
+    }
+    public bool IsPasswordValid(byte[] password, byte[] passwordConfirm)
+    {
+        if (password is null || passwordConfirm is null)
+            return false;
+
+        if (password.Length != passwordConfirm.Length)
+            return false;
+
+        return CryptographicOperations.FixedTimeEquals(password, passwordConfirm);
     }
     #endregion
 }

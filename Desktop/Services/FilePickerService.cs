@@ -1,11 +1,11 @@
-using System;
-using System.Linq;
-using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Artemis.Desktop.Services;
 
@@ -36,7 +36,7 @@ public class FilePickerService : IFilePickerService
         return file?.TryGetLocalPath();
     }
 
-    public async Task<IReadOnlyList<string>?> OpenFolderAsync(string title = "Select Folder", bool allowMultiple = false)
+    public async Task<string>? OpenFolderAsync(string title = "Select Folder", bool allowMultiple = false)
     {
         var topLevel = GetTopLevel();
         var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
@@ -44,10 +44,8 @@ public class FilePickerService : IFilePickerService
             AllowMultiple = allowMultiple,
             Title = title
         });
-        return folders?.Count > 0 ? folders
-        .Select(c => c.TryGetLocalPath())
-        .OfType<string>()
-        .ToList() : null;
+        string actualPath;
+        return folders?.Count > 0 ? actualPath = folders[0].Path.LocalPath : null;
     }
 
     private static Window GetTopLevel()
