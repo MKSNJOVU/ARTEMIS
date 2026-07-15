@@ -19,12 +19,11 @@ public class SecurityHelper : AvaloniaObject
 {
     static SecurityHelper()
     {
-        // EXCELLENCE: Instead of listening to EVERY TextBox globally, 
-        // we only react when our property is ATTACHED to a specific instance.
+        
         SecurePasswordProperty.Changed.AddClassHandler<TextBox>(HandleSecurePasswordChanged);
     }
 
-    private static readonly ConditionalWeakTable<TextBox, IDisposable> _textSubscriptions = new();
+    private static readonly ConditionalWeakTable<TextBox, IDisposable> _textSubscriptions = [];
 
     public static readonly AttachedProperty<byte[]?> SecurePasswordProperty =
         AvaloniaProperty.RegisterAttached<SecurityHelper, TextBox, byte[]?>("SecurePassword", default(byte[]?), false, BindingMode.TwoWay);
@@ -49,13 +48,13 @@ public class SecurityHelper : AvaloniaObject
     private static void UpdateBuffer(TextBox textBox)
     {
         // Clear any previously stored password buffer to minimize secret lifetime
-        var oldBuffer = GetSecurePassword(textBox);
+        byte[]? oldBuffer = GetSecurePassword(textBox);
         if (oldBuffer is not null)
             Array.Clear(oldBuffer, 0, oldBuffer.Length);
 
-        var text = textBox.Text;
+        string? text = textBox.Text;
         // Convert string to byte[] and update the bound property
-        var newBuffer = string.IsNullOrEmpty(text) ? null : Encoding.UTF8.GetBytes(text);
+        byte[]? newBuffer = string.IsNullOrEmpty(text) ? null : Encoding.UTF8.GetBytes(text);
         SetSecurePassword(textBox, newBuffer);
     }
 
@@ -68,7 +67,7 @@ public class SecurityHelper : AvaloniaObject
     /// <param name="topLevel">The current TopLevel (Window/Control) context.</param>
     public static async System.Threading.Tasks.Task ClearClipboardAsync(TopLevel? topLevel)
     {
-        var clipboard = topLevel?.Clipboard;
+        IClipboard? clipboard = topLevel?.Clipboard;
         if (clipboard != null)
         {
             await clipboard.SetTextAsync(null);

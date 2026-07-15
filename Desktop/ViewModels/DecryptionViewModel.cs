@@ -96,7 +96,7 @@ public partial class DecryptionViewModel : ViewModelBase
         CurrentState = OperationState.Processing;
 
         string? savePath = SelectedFilePath;
-        string decryptDestination = string.Empty;
+        string? decryptDestination = string.Empty;
         try
         {
             // 2. Determine the suggested save name. 
@@ -144,11 +144,11 @@ public partial class DecryptionViewModel : ViewModelBase
         }
         catch (CryptographicException)
         {
-            ErrorMessage = "Decryption failed. Wrong password or corrupted file.";
+            StatusMessage = "Decryption failed. Wrong password or corrupted file.";
             CurrentState = OperationState.Faulted;
 
             // 5. Cleanup the corrupted file
-            if (Path.Exists(decryptDestination))
+            if (decryptDestination is not null && Path.Exists(decryptDestination))
             {
                 File.Delete(decryptDestination);
             }
@@ -158,7 +158,7 @@ public partial class DecryptionViewModel : ViewModelBase
             ErrorMessage = $"An error occurred: {e.Message}";
             CurrentState = OperationState.Faulted;
 
-            if (Path.Exists(decryptDestination))
+            if (decryptDestination is not null && Path.Exists(decryptDestination))
             {
                 File.Delete(decryptDestination);
             }
@@ -171,7 +171,7 @@ public partial class DecryptionViewModel : ViewModelBase
             Password = null;
         }
     }
-    #region
+    #region State Management Helpers
     private void ResetState()
     {
         CurrentState = OperationState.Idle;
