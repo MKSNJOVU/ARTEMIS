@@ -127,7 +127,7 @@ public class EncryptionService : IEncryptionService
         byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
 
         // Derive the AES key (Only happens once!)
-        byte[]? key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
+        byte[] key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
 
         // MEMORY OPTIMIZATION: Rent/Allocate buffers ONCE
         byte[] plainTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
