@@ -96,7 +96,7 @@ public partial class DecryptionViewModel : ViewModelBase
         CurrentState = OperationState.Processing;
 
         string? savePath = SelectedFilePath;
-        string decryptDestination = string.Empty;
+        string? decryptDestination = string.Empty;
         try
         {
             // 2. Determine the suggested save name. 
@@ -132,8 +132,8 @@ public partial class DecryptionViewModel : ViewModelBase
             }
 
             // 4. Open the Streams and execute!
-            using (var sourceStream = new FileStream(savePath, FileMode.Open, FileAccess.Read, FileShare.Read))
-            using (var destinationStream = new FileStream(decryptDestination, FileMode.Create, FileAccess.Write, FileShare.None))
+            using (FileStream sourceStream = new FileStream(savePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (FileStream destinationStream = new FileStream(decryptDestination, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password);
             }
@@ -148,7 +148,7 @@ public partial class DecryptionViewModel : ViewModelBase
             CurrentState = OperationState.Faulted;
 
             // 5. Cleanup the corrupted file
-            if (Path.Exists(decryptDestination))
+            if (decryptDestination is not null && Path.Exists(decryptDestination))
             {
                 File.Delete(decryptDestination);
             }
@@ -158,7 +158,7 @@ public partial class DecryptionViewModel : ViewModelBase
             ErrorMessage = $"An error occurred: {e.Message}";
             CurrentState = OperationState.Faulted;
 
-            if (Path.Exists(decryptDestination))
+            if (decryptDestination is not null && Path.Exists(decryptDestination))
             {
                 File.Delete(decryptDestination);
             }
@@ -171,7 +171,7 @@ public partial class DecryptionViewModel : ViewModelBase
             Password = null;
         }
     }
-    #region
+    #region State Management Helpers
     private void ResetState()
     {
         CurrentState = OperationState.Idle;

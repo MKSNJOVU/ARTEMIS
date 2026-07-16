@@ -25,7 +25,7 @@ public class EncryptionService : IEncryptionService
     public async Task EncryptAsync(Stream source, Stream destination, byte[] password, string associatedData)
     {
         // Generate and Write the Global Salt (Header)
-        var randomSalt = new byte[CryptoConstants.SaltSize];
+        byte[] randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
         await destination.WriteAsync(randomSalt);
 
@@ -36,11 +36,11 @@ public class EncryptionService : IEncryptionService
         await destination.WriteAsync(extBytes);
 
         //  Derive the AES key
-        var key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
+        byte[]? key = await _keyDerivationService.DeriveKeyAsync(password, randomSalt);
 
         try
         {
-            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
+            using (AesGcm aes = new AesGcm(key, CryptoConstants.TagSize))
             {
                 //MEMORY OPTIMIZATION: Allocate/Rent buffers ONCE outside the loop!
                 // We use ArrayPool for the large 64KB buffers to save the Garbage Collector
@@ -73,8 +73,8 @@ public class EncryptionService : IEncryptionService
                     Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
                     // Slice our rented buffers to the exact size of the data we just read
-                    var plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
-                    var cipherTextSpan = new Span<byte>(cipherTextBuffer, 0, bytesRead);
+                    ReadOnlySpan<byte> plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
+                    Span<byte> cipherTextSpan = new Span<byte>(cipherTextBuffer, 0, bytesRead);
 
                     // -- ENCRYPT --
 
@@ -117,7 +117,7 @@ public class EncryptionService : IEncryptionService
     public async Task DecryptAsync(Stream source, Stream destination, byte[] password)
     {
         // Prepare and read the Global Salt and File Extension(Header)
-        var extractedSALT = await ExtractGlobalSALT(source);
+        byte[]? extractedSALT = await ExtractGlobalSALT(source);
 
         int extensionLength = await ExtractExtensionLength(source);
 
@@ -127,61 +127,59 @@ public class EncryptionService : IEncryptionService
         byte[] aadBytes = new byte[sizeof(int) + fileExtensionBytes.Length];
 
         // Derive the AES key (Only happens once!)
-        var key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
+        byte[] key = await _keyDerivationService.DeriveKeyAsync(password, extractedSALT);
 
         // MEMORY OPTIMIZATION: Rent/Allocate buffers ONCE
         byte[] plainTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
         byte[] cipherTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
         try
         {
-            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
+            using AesGcm aes = new AesGcm(key, CryptoConstants.TagSize);
+
+            byte[] ivBuffer = new byte[CryptoConstants.IvSize];
+            byte[] tagBuffer = new byte[CryptoConstants.TagSize];
+            byte[] lengthBuffer = new byte[sizeof(int)];
+
+            Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
+
+            int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
+
+
+            int lengthBytesRead = 0;
+
+            while ((lengthBytesRead = await source.ReadAsync(lengthBuffer)) > 0)
             {
-                byte[] ivBuffer = new byte[CryptoConstants.IvSize];
-                byte[] tagBuffer = new byte[CryptoConstants.TagSize];
-                var lengthBuffer = new byte[sizeof(int)];
+                // If we read some bytes but not exactly 4, the file is corrupted/cut off
+                if (lengthBytesRead != sizeof(int))
+                    throw new CryptographicException("Error: The file has been corrupted");
 
-                Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
+                // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
+                int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);
 
-                int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
+                // READ THE EXACT CHUNK COMPONENTS IN ORDER
+                await source.ReadExactlyAsync(ivBuffer);
 
-                // THE RADAR: Read the 4-byte chunk length.
-                // If it returns 0, we cleanly hit the end of the file!
-                int lengthBytesRead = 0;
+                await source.ReadExactlyAsync(new Memory<byte>(cipherTextBuffer, 0, currentCiphertextLength));
 
-                while ((lengthBytesRead = await source.ReadAsync(lengthBuffer)) > 0)
-                {
-                    // If we read some bytes but not exactly 4, the file is corrupted/cut off
-                    if (lengthBytesRead != sizeof(int))
-                        throw new CryptographicException("Error: The file has been corrupted");
+                await source.ReadExactlyAsync(tagBuffer);
 
-                    // Convert those 4 bytes into an actual integer so we know how much Ciphertext to read!
-                    int currentCiphertextLength = BitConverter.ToInt32(lengthBuffer);
+                // PREPARE THE SPANS & AAD
 
-                    // READ THE EXACT CHUNK COMPONENTS IN ORDER
-                    await source.ReadExactlyAsync(ivBuffer);
+                byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
+                Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
-                    await source.ReadExactlyAsync(new Memory<byte>(cipherTextBuffer, 0, currentCiphertextLength));
+                ReadOnlySpan<byte> cipherText = new(cipherTextBuffer, 0, currentCiphertextLength);
 
-                    await source.ReadExactlyAsync(tagBuffer);
+                Span<byte> plainText = new(plainTextBuffer, 0, currentCiphertextLength);
 
-                    // PREPARE THE SPANS & AAD
+                //  DECRYPT
+                aes.Decrypt(ivBuffer, cipherText, tagBuffer, plainText, associatedData: aadBytes);
 
-                    byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
-                    Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
+                // WRITE TO DESTINATION
+                await destination.WriteAsync(new ReadOnlyMemory<byte>(plainTextBuffer, 0, currentCiphertextLength));
 
-                    var cipherText = new ReadOnlySpan<byte>(cipherTextBuffer, 0, currentCiphertextLength);
-
-                    var plainText = new Span<byte>(plainTextBuffer, lengthBytesRead, currentCiphertextLength);
-
-                    //  DECRYPT
-                    aes.Decrypt(ivBuffer, cipherText, tagBuffer, plainText, associatedData: aadBytes);
-
-                    // WRITE TO DESTINATION
-                    await destination.WriteAsync(new ReadOnlyMemory<byte>(plainTextBuffer, 0, currentCiphertextLength));
-
-                    // Increment the index for the next loop!
-                    chunkIndex++;
-                }
+                // Increment the index for the next loop!
+                chunkIndex++;
             }
         }
         catch (CryptographicException)
@@ -200,7 +198,7 @@ public class EncryptionService : IEncryptionService
 
     private async Task<byte[]> ExtractGlobalSALT(Stream source)
     {
-        var extractedSALT = new byte[CryptoConstants.SaltSize];
+        byte[]? extractedSALT = new byte[CryptoConstants.SaltSize];
         await source.ReadExactlyAsync(extractedSALT);
 
         return extractedSALT;
@@ -208,16 +206,15 @@ public class EncryptionService : IEncryptionService
 
     private async Task<int> ExtractExtensionLength(Stream source)
     {
-        var lengthBuffer = new byte[sizeof(int)];
+        byte[]? lengthBuffer = new byte[sizeof(int)];
         await source.ReadExactlyAsync(lengthBuffer);
 
 
         int extensionLength = BitConverter.ToInt32(lengthBuffer);
 
-        if (extensionLength <= 0 || extensionLength > 256)
-            throw new CryptographicException("Invalid file header or corrupted extension length.");
-
-        return extensionLength;
+        return extensionLength <= 0 || extensionLength > 256
+            ? throw new CryptographicException("Invalid file header or corrupted extension length.")
+            : extensionLength;
     }
     #endregion
 }

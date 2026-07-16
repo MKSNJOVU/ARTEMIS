@@ -19,8 +19,7 @@ public class SecurityHelper : AvaloniaObject
 {
     static SecurityHelper()
     {
-        // EXCELLENCE: Instead of listening to EVERY TextBox globally, 
-        // we only react when our property is ATTACHED to a specific instance.
+
         SecurePasswordProperty.Changed.AddClassHandler<TextBox>(HandleSecurePasswordChanged);
     }
 
@@ -36,7 +35,7 @@ public class SecurityHelper : AvaloniaObject
         if (!_textSubscriptions.TryGetValue(textBox, out _))
         {
             // SURGICAL: Subscribe ONLY to this specific TextBox's Text changes
-            var subscription = textBox.GetObservable(TextBox.TextProperty)
+            IDisposable subscription = textBox.GetObservable(TextBox.TextProperty)
                                       .Skip(1)
                                       .Subscribe(_ => UpdateBuffer(textBox));
             // LEAK PROTECTION: Store the subscription in a table that lets go when the TextBox is destroyed
@@ -49,13 +48,13 @@ public class SecurityHelper : AvaloniaObject
     private static void UpdateBuffer(TextBox textBox)
     {
         // Clear any previously stored password buffer to minimize secret lifetime
-        var oldBuffer = GetSecurePassword(textBox);
+        byte[]? oldBuffer = GetSecurePassword(textBox);
         if (oldBuffer is not null)
             Array.Clear(oldBuffer, 0, oldBuffer.Length);
 
-        var text = textBox.Text;
+        string? text = textBox.Text;
         // Convert string to byte[] and update the bound property
-        var newBuffer = string.IsNullOrEmpty(text) ? null : Encoding.UTF8.GetBytes(text);
+        byte[]? newBuffer = string.IsNullOrEmpty(text) ? null : Encoding.UTF8.GetBytes(text);
         SetSecurePassword(textBox, newBuffer);
     }
 
@@ -68,7 +67,7 @@ public class SecurityHelper : AvaloniaObject
     /// <param name="topLevel">The current TopLevel (Window/Control) context.</param>
     public static async System.Threading.Tasks.Task ClearClipboardAsync(TopLevel? topLevel)
     {
-        var clipboard = topLevel?.Clipboard;
+        IClipboard? clipboard = topLevel?.Clipboard;
         if (clipboard != null)
         {
             await clipboard.SetTextAsync(null);
