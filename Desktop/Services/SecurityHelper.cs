@@ -19,11 +19,11 @@ public class SecurityHelper : AvaloniaObject
 {
     static SecurityHelper()
     {
-        
+
         SecurePasswordProperty.Changed.AddClassHandler<TextBox>(HandleSecurePasswordChanged);
     }
 
-    private static readonly ConditionalWeakTable<TextBox, IDisposable> _textSubscriptions = [];
+    private static readonly ConditionalWeakTable<TextBox, IDisposable> _textSubscriptions = new();
 
     public static readonly AttachedProperty<byte[]?> SecurePasswordProperty =
         AvaloniaProperty.RegisterAttached<SecurityHelper, TextBox, byte[]?>("SecurePassword", default(byte[]?), false, BindingMode.TwoWay);
@@ -35,7 +35,7 @@ public class SecurityHelper : AvaloniaObject
         if (!_textSubscriptions.TryGetValue(textBox, out _))
         {
             // SURGICAL: Subscribe ONLY to this specific TextBox's Text changes
-            var subscription = textBox.GetObservable(TextBox.TextProperty)
+            IDisposable subscription = textBox.GetObservable(TextBox.TextProperty)
                                       .Skip(1)
                                       .Subscribe(_ => UpdateBuffer(textBox));
             // LEAK PROTECTION: Store the subscription in a table that lets go when the TextBox is destroyed

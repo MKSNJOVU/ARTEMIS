@@ -25,7 +25,7 @@ public class EncryptionService : IEncryptionService
     public async Task EncryptAsync(Stream source, Stream destination, byte[] password, string associatedData)
     {
         // Generate and Write the Global Salt (Header)
-        byte[]? randomSalt = new byte[CryptoConstants.SaltSize];
+        byte[] randomSalt = new byte[CryptoConstants.SaltSize];
         RandomNumberGenerator.Fill(randomSalt);
         await destination.WriteAsync(randomSalt);
 
@@ -40,7 +40,7 @@ public class EncryptionService : IEncryptionService
 
         try
         {
-            using (var aes = new AesGcm(key, CryptoConstants.TagSize))
+            using (AesGcm aes = new AesGcm(key, CryptoConstants.TagSize))
             {
                 //MEMORY OPTIMIZATION: Allocate/Rent buffers ONCE outside the loop!
                 // We use ArrayPool for the large 64KB buffers to save the Garbage Collector
@@ -73,8 +73,8 @@ public class EncryptionService : IEncryptionService
                     Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
                     // Slice our rented buffers to the exact size of the data we just read
-                    var plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
-                    var cipherTextSpan = new Span<byte>(cipherTextBuffer, 0, bytesRead);
+                    ReadOnlySpan<byte> plainTextSpan = new ReadOnlySpan<byte>(plainTextBuffer, 0, bytesRead);
+                    Span<byte> cipherTextSpan = new Span<byte>(cipherTextBuffer, 0, bytesRead);
 
                     // -- ENCRYPT --
 
@@ -134,17 +134,17 @@ public class EncryptionService : IEncryptionService
         byte[] cipherTextBuffer = ArrayPool<byte>.Shared.Rent(CryptoConstants.ChunkSizeBytes);
         try
         {
-            using var aes = new AesGcm(key, CryptoConstants.TagSize);
-            
+            using AesGcm aes = new AesGcm(key, CryptoConstants.TagSize);
+
             byte[] ivBuffer = new byte[CryptoConstants.IvSize];
             byte[] tagBuffer = new byte[CryptoConstants.TagSize];
-            byte[]? lengthBuffer = new byte[sizeof(int)];
+            byte[] lengthBuffer = new byte[sizeof(int)];
 
             Buffer.BlockCopy(fileExtensionBytes, 0, aadBytes, sizeof(int), fileExtensionBytes.Length);
 
             int chunkIndex = 0; // INTEGRITY: Keep track of which chunk we are on for AAD
 
-          
+
             int lengthBytesRead = 0;
 
             while ((lengthBytesRead = await source.ReadAsync(lengthBuffer)) > 0)
@@ -168,9 +168,9 @@ public class EncryptionService : IEncryptionService
                 byte[] currentIndexBytes = BitConverter.GetBytes(chunkIndex);
                 Buffer.BlockCopy(currentIndexBytes, 0, aadBytes, 0, sizeof(int));
 
-                ReadOnlySpan<byte> cipherText = new (cipherTextBuffer, 0, currentCiphertextLength);
+                ReadOnlySpan<byte> cipherText = new(cipherTextBuffer, 0, currentCiphertextLength);
 
-                Span<byte> plainText = new (plainTextBuffer, lengthBytesRead, currentCiphertextLength);
+                Span<byte> plainText = new(plainTextBuffer, 0, currentCiphertextLength);
 
                 //  DECRYPT
                 aes.Decrypt(ivBuffer, cipherText, tagBuffer, plainText, associatedData: aadBytes);
@@ -212,10 +212,9 @@ public class EncryptionService : IEncryptionService
 
         int extensionLength = BitConverter.ToInt32(lengthBuffer);
 
-        if (extensionLength <= 0 || extensionLength > 256)
-            throw new CryptographicException("Invalid file header or corrupted extension length.");
-
-        return extensionLength;
+        return extensionLength <= 0 || extensionLength > 256
+            ? throw new CryptographicException("Invalid file header or corrupted extension length.")
+            : extensionLength;
     }
     #endregion
 }
