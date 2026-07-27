@@ -8,3 +8,17 @@ While it implements cryptographic practices, it has not been independently audit
 
 ## Download and Usage
 Head to the [Releases](../../releases) page on the right side of this repository to download the standalone executable for your operating system (Windows, macOS, or Linux). No installation is required.
+
+### Linux Installation Note
+After downloading `Artemis-Linux`, you must grant it permission to run as an executable:
+
+**Via Terminal:**
+Navigate to the directory you downloaded the executable then follow these commands
+
+```bash
+chmod +x Artemis-Linux
+./Artemis-Linux
+```
+
+**Via the GUI**
+Right-click the file -> Properties -> Permissions -> **Check "Allow executing file as program".**
