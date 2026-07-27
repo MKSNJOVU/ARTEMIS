@@ -1,0 +1,43 @@
+name: Close External PRs
+
+# trigger on new pull requests
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  close-unauthorized-pr:
+    runs-on: ubuntu-latest
+    # Only execute if the user is NOT an owner or official collaborator
+    if: >
+      github.event.pull_request.author_association != 'OWNER' &&
+      github.event.pull_request.author_association != 'COLLABORATOR' &&
+      github.event.pull_request.author_association != 'MEMBER'
+    
+    steps:
+      - name: Post comment and close PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            // The message that will be posted on the PR
+            const commentBody = "Thank you for your interest in contributing! 👋\n\nCurrently, Artemis is in the Alpha phase and we are **not accepting external pull requests**. Please review our [Contributing Guidelines](https://github.com/${{ github.repository }}/blob/main/CONTRIBUTING.md) for more details. \n\nIf you have found a bug or have a feature request, please open an Issue using our templates. \n\n*This PR is being automatically closed.*";
+            
+            // Post the comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: commentBody
+            });
+            
+            // Close the pull request
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              state: 'closed'
+            });

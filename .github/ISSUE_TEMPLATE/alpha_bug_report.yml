@@ -1,0 +1,36 @@
+name: Alpha Bug Report
+description: Report a bug encountered in the Alpha release of Artemis.
+title: "[Alpha Bug]: "
+labels: ["bug", "alpha"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing the alpha release! Please provide as much detail as possible so the contributors can investigate and resolve the issue.
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Which OS were you running the executable on?
+      options:
+        - Windows
+        - Linux (Ubuntu/Debian)
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: What exactly were you doing when the error occurred?
+      placeholder: 1. Selected a .txt file...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages or Logs
+      description: Paste any crash logs or terminal errors here.
+    validations:
+      required: false
