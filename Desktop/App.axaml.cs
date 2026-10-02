@@ -1,3 +1,4 @@
+using System;
 using Artemis.Core.Cryptography;
 using Artemis.Core.Interfaces;
 using Artemis.Desktop.Services;
@@ -8,7 +9,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
-using System;
+
 namespace Artemis.Desktop;
 
 public partial class App : Application
@@ -27,6 +28,9 @@ public partial class App : Application
         var serviceProvider = services.BuildServiceProvider();
         Services = serviceProvider;
 
+        var settings = Services.GetRequiredService<ISettingsService>();
+        ThemeService.Apply(settings.Current.Theme);
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow
@@ -36,32 +40,30 @@ public partial class App : Application
 
             desktop.Exit += async (_, _) =>
             {
-                var clipboardService = Services.GetRequiredService<IClipboardService>();
-                await clipboardService.ClearClipboardAsync();
+                var mainWindow = Services.GetRequiredService<MainWindowViewModel>();
+                await mainWindow.OnExitAsync();
             };
 
             desktop.Exit += (_, _) => serviceProvider.Dispose();
         }
     }
 
-
     private static void ConfigureServices(IServiceCollection services)
     {
-        // Core
         services.AddSingleton<IKeyDerivationService, KeyDerivationService>();
         services.AddSingleton<IEncryptionService, EncryptionService>();
 
-        // Desktop services
         services.AddSingleton<IFilePickerService, FilePickerService>();
         services.AddSingleton<IDialogService, DialogService>();
         services.AddSingleton<IClipboardService, ClipboardService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton<IRecentFilesService, RecentFilesService>();
+        services.AddSingleton<INotificationService, NotificationService>();
+        services.AddSingleton<IShellRevealService, ShellRevealService>();
 
-
-
-        // ViewModels
-        services.AddTransient<EncryptionViewModel>();
-        services.AddTransient<DecryptionViewModel>();
+        services.AddSingleton<EncryptionViewModel>();
+        services.AddSingleton<DecryptionViewModel>();
+        services.AddSingleton<SettingsViewModel>();
         services.AddSingleton<MainWindowViewModel>();
     }
-
 }

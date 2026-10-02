@@ -1,0 +1,80 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Artemis.Desktop.ViewModels"
+             x:Class="Artemis.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+    <StackPanel MaxWidth="720" Spacing="16">
+        <TextBlock Text="Settings" Classes="PageTitle"/>
+        <TextBlock Text="Theme, output folders, and clipboard policy for this device."
+                   Classes="Helper"/>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Appearance" Classes="SectionLabel"/>
+                <TextBlock Text="Dark is the Artemis brand default. Light and system follow the same teal accent."
+                           Classes="Helper"/>
+                <ComboBox ItemsSource="{Binding ThemeOptions}"
+                          SelectedItem="{Binding Theme}"
+                          HorizontalAlignment="Left"
+                          MinWidth="180"
+                          AutomationProperties.Name="Theme"/>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Default output folder" Classes="SectionLabel"/>
+                <TextBlock Text="When set, encryption writes here instead of asking every time."
+                           Classes="Helper"/>
+                <TextBlock Text="{Binding DefaultOutputFolder, TargetNullValue='No default folder'}"
+                           TextWrapping="Wrap"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="Primary" Content="Choose folder" Command="{Binding BrowseOutputFolderCommand}"/>
+                    <Button Classes="Ghost" Content="Clear" Command="{Binding ClearOutputFolderCommand}"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Clipboard" Classes="SectionLabel"/>
+                <CheckBox Content="Wipe clipboard when Artemis exits"
+                          IsChecked="{Binding WipeClipboardOnExit}"
+                          AutomationProperties.Name="Wipe clipboard on exit"/>
+                <TextBlock Text="Automatically wipe the clipboard after a successful operation. Use 0 to disable."
+                           Classes="Helper"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <NumericUpDown Minimum="0"
+                                   Maximum="300"
+                                   Value="{Binding ClipboardAutoWipeSeconds}"
+                                   Width="120"
+                                   AutomationProperties.Name="Clipboard auto-wipe seconds"/>
+                    <TextBlock Text="seconds" VerticalAlignment="Center" Classes="Helper"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Recent files" Classes="SectionLabel"/>
+                <CheckBox Content="Remember recent file paths (never passwords)"
+                          IsChecked="{Binding RememberRecentFiles}"
+                          AutomationProperties.Name="Remember recent files"/>
+                <Button Classes="Ghost"
+                        Content="Clear recent files"
+                        HorizontalAlignment="Left"
+                        Command="{Binding ClearRecentFilesCommand}"/>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="About" Classes="SectionLabel"/>
+                <TextBlock Text="Artemis Desktop" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding AppVersion, StringFormat='Version {0}'}" Classes="Helper"/>
+                <TextBlock Text="{Binding Disclaimer}" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

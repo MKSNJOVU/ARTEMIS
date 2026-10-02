@@ -1,43 +1,199 @@
- <Window xmlns="https://github.com/avaloniaui"
-         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-         xmlns:vm="using:Artemis.Desktop.ViewModels"
-         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-         x:Class="Artemis.Desktop.Views.MainWindow"
-         x:DataType="vm:MainWindowViewModel"
-         Icon="/Assets/avalonia-logo.ico"
-            Title="Artemis Desktop">
-   
-        <DockPanel>
-            <!-- Navigation Bar -->
-            <Border DockPanel.Dock="Top" Background="#1E3A5F" Padding="10">
-                <Grid ColumnDefinitions="*, Auto, *">
-                    <!-- Navigation Buttons (Centered) -->
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-                        <Button Content="Encrypt"
-								Foreground=""
-                                Command="{Binding ShowEncryptCommand}"
-                                Width="100" HorizontalContentAlignment="Center"/>
-                        <Button Content="Decrypt" 
-                                Command="{Binding ShowDecryptCommand}"
-								Foreground=""
-                                Width="100" HorizontalContentAlignment="Center"/>
-                    </StackPanel>
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Artemis.Desktop.ViewModels"
+        xmlns:models="using:Artemis.Desktop.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="960" d:DesignHeight="640"
+        x:Class="Artemis.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/artemis.png"
+        Title="Artemis"
+        Width="960"
+        Height="640"
+        MinWidth="800"
+        MinHeight="520"
+        ExtendClientAreaToDecorationsHint="{Binding UseCustomChrome}">
 
-                    <!-- Security Tool (Right-aligned) -->
-                    <Button Grid.Column="2" 
-                            Content="Wipe Clipboard" 
-                            Command="{Binding WipeClipboardCommand}"
-                            HorizontalAlignment="Right"
-                            Background="#FFE0E0" 
-                            Foreground="#D32F2F"
-                            ToolTip.Tip="Clear sensitive data from the system clipboard"/>
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+1" Command="{Binding ShowEncryptCommand}"/>
+        <KeyBinding Gesture="Ctrl+2" Command="{Binding ShowDecryptCommand}"/>
+        <KeyBinding Gesture="Ctrl+OemComma" Command="{Binding ShowSettingsCommand}"/>
+        <KeyBinding Gesture="Ctrl+K" Command="{Binding ToggleCommandPaletteCommand}"/>
+        <KeyBinding Gesture="Ctrl+Shift+X" Command="{Binding WipeClipboardCommand}"/>
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding SelectFilesCommand}"/>
+        <KeyBinding Gesture="Ctrl+Enter" Command="{Binding RunCurrentCommand}"/>
+        <KeyBinding Gesture="Escape" Command="{Binding EscapeCommand}"/>
+    </Window.KeyBindings>
+
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0"
+                Classes="TitleBar"
+                WindowDecorationProperties.ElementRole="TitleBar">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button Classes="Ghost Icon"
+                            Command="{Binding TogglePaneCommand}"
+                            ToolTip.Tip="Toggle navigation"
+                            AutomationProperties.Name="Toggle navigation"
+                            WindowDecorationProperties.ElementRole="User">
+                        <PathIcon Width="14" Height="14" Data="M4,7 H20 M4,12 H20 M4,17 H20"/>
+                    </Button>
+                    <Image Source="/Assets/artemis.png" Width="20" Height="20"/>
+                    <TextBlock Text="Artemis" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding CurrentPageTitle}"
+                               Classes="Helper"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <Panel Grid.Column="1"/>
+
+                <Button Grid.Column="2"
+                        Classes="Danger"
+                        Content="Wipe Clipboard"
+                        Command="{Binding WipeClipboardCommand}"
+                        VerticalAlignment="Center"
+                        Margin="0,0,8,0"
+                        ToolTip.Tip="Clear sensitive data from the system clipboard (Ctrl+Shift+X)"
+                        AutomationProperties.Name="Wipe clipboard"
+                        WindowDecorationProperties.ElementRole="User"/>
+
+                <StackPanel Grid.Column="3"
+                            Orientation="Horizontal"
+                            IsVisible="{Binding UseCustomChrome}"
+                            WindowDecorationProperties.ElementRole="User">
+                    <Button Classes="Caption"
+                            Content="─"
+                            Click="OnMinimize"
+                            AutomationProperties.Name="Minimize"
+                            WindowDecorationProperties.ElementRole="MinimizeButton"/>
+                    <Button Classes="Caption"
+                            Content="□"
+                            Click="OnMaximize"
+                            AutomationProperties.Name="Maximize"
+                            WindowDecorationProperties.ElementRole="MaximizeButton"/>
+                    <Button Classes="Caption close"
+                            Content="✕"
+                            Click="OnClose"
+                            AutomationProperties.Name="Close"
+                            WindowDecorationProperties.ElementRole="CloseButton"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <SplitView Grid.Row="1"
+                   IsPaneOpen="{Binding IsPaneOpen, Mode=TwoWay}"
+                   DisplayMode="CompactInline"
+                   CompactPaneLength="64"
+                   OpenPaneLength="220"
+                   PaneBackground="{DynamicResource ArtemisRaisedBrush}">
+            <SplitView.Pane>
+                <DockPanel>
+                    <Button DockPanel.Dock="Bottom"
+                            Classes="NavItem"
+                            Classes.selected="{Binding IsSettingsSelected}"
+                            Command="{Binding ShowSettingsCommand}"
+                            ToolTip.Tip="Settings"
+                            AutomationProperties.Name="Settings">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <PathIcon Data="{DynamicResource IconSettings}" Width="16" Height="16"/>
+                            <TextBlock Text="Settings" VerticalAlignment="Center" IsVisible="{Binding IsPaneOpen}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <StackPanel Margin="0,12,0,0">
+                        <Button Classes="NavItem"
+                                Classes.selected="{Binding IsEncryptSelected}"
+                                Command="{Binding ShowEncryptCommand}"
+                                ToolTip.Tip="Encrypt (Ctrl+1)"
+                                AutomationProperties.Name="Encrypt">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <PathIcon Data="{DynamicResource IconLock}" Width="16" Height="16"/>
+                                <TextBlock Text="Encrypt" VerticalAlignment="Center" IsVisible="{Binding IsPaneOpen}"/>
+                            </StackPanel>
+                        </Button>
+                        <Button Classes="NavItem"
+                                Classes.selected="{Binding IsDecryptSelected}"
+                                Command="{Binding ShowDecryptCommand}"
+                                ToolTip.Tip="Decrypt (Ctrl+2)"
+                                AutomationProperties.Name="Decrypt">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <PathIcon Data="{DynamicResource IconUnlock}" Width="16" Height="16"/>
+                                <TextBlock Text="Decrypt" VerticalAlignment="Center" IsVisible="{Binding IsPaneOpen}"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
+            </SplitView.Pane>
+
+            <Grid>
+                <ScrollViewer>
+                    <ContentControl Content="{Binding CurrentView}" Margin="28,20"/>
+                </ScrollViewer>
+
+                <ItemsControl ItemsSource="{Binding Notifications}"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Top"
+                              Margin="0,16,16,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="8"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:NotificationItem">
+                            <Border Classes="Toast">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <TextBlock Text="{Binding Message}" TextWrapping="Wrap"/>
+                                    <Button Grid.Column="1"
+                                            Classes="Icon"
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).DismissNotificationCommand}"
+                                            CommandParameter="{Binding}"
+                                            AutomationProperties.Name="Dismiss notification">
+                                        <PathIcon Data="{DynamicResource IconClose}" Width="10" Height="10"/>
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Grid IsVisible="{Binding IsCommandPaletteOpen}" ZIndex="20">
+                    <Border Background="{DynamicResource ArtemisOverlayBrush}"
+                            PointerPressed="OnPaletteBackdropPressed"/>
+                    <Border Classes="Card"
+                            Width="520"
+                            MaxHeight="360"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            Margin="0,72,0,0"
+                            Padding="12">
+                        <DockPanel>
+                            <TextBox x:Name="PaletteSearchBox"
+                                     DockPanel.Dock="Top"
+                                     Text="{Binding PaletteQuery}"
+                                     PlaceholderText="Type a command..."
+                                     AutomationProperties.Name="Command palette search"/>
+                            <ListBox Classes="CommandList"
+                                     Margin="0,8,0,0"
+                                     ItemsSource="{Binding FilteredCommands}"
+                                     SelectedItem="{Binding SelectedCommand}"
+                                     DoubleTapped="OnPaletteItemActivated">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="models:CommandItem">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Title}"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Shortcut}"
+                                                       Classes="Helper"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
                 </Grid>
-            </Border>
-   
-            <!-- Main Content Area -->
-            <ContentControl Content="{Binding CurrentView}" Margin="10" />
-        </DockPanel>
-   
-    </Window>
+            </Grid>
+        </SplitView>
+    </Grid>
+</Window>

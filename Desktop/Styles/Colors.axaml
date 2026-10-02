@@ -1,0 +1,97 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Dark">
+            <Color x:Key="ArtemisInkColor">#0A0E14</Color>
+            <Color x:Key="ArtemisRaisedColor">#121A24</Color>
+            <Color x:Key="ArtemisCardColor">#182230</Color>
+            <Color x:Key="ArtemisTextColor">#E8EEF4</Color>
+            <Color x:Key="ArtemisMutedColor">#8B9BB0</Color>
+            <Color x:Key="ArtemisAccentColor">#2DD4BF</Color>
+            <Color x:Key="ArtemisAccentSoftColor">#332DD4BF</Color>
+            <Color x:Key="ArtemisSuccessColor">#3DDC97</Color>
+            <Color x:Key="ArtemisWarningColor">#F59E0B</Color>
+            <Color x:Key="ArtemisDangerColor">#E85D5D</Color>
+            <Color x:Key="ArtemisBorderColor">#14FFFFFF</Color>
+            <Color x:Key="ArtemisOverlayColor">#990A0E14</Color>
+            <Color x:Key="ArtemisOnAccentColor">#0A0E14</Color>
+            <Color x:Key="SystemAccentColor">#2DD4BF</Color>
+            <Color x:Key="SystemAccentColorDark1">#25C4B0</Color>
+            <Color x:Key="SystemAccentColorDark2">#1AA898</Color>
+            <Color x:Key="SystemAccentColorDark3">#148F82</Color>
+            <Color x:Key="SystemAccentColorLight1">#5EE0D0</Color>
+            <Color x:Key="SystemAccentColorLight2">#99EDE3</Color>
+            <Color x:Key="SystemAccentColorLight3">#C5F6F0</Color>
+
+            <SolidColorBrush x:Key="ArtemisInkBrush" Color="{StaticResource ArtemisInkColor}"/>
+            <SolidColorBrush x:Key="ArtemisRaisedBrush" Color="{StaticResource ArtemisRaisedColor}"/>
+            <SolidColorBrush x:Key="ArtemisCardBrush" Color="{StaticResource ArtemisCardColor}"/>
+            <SolidColorBrush x:Key="ArtemisTextBrush" Color="{StaticResource ArtemisTextColor}"/>
+            <SolidColorBrush x:Key="ArtemisMutedBrush" Color="{StaticResource ArtemisMutedColor}"/>
+            <SolidColorBrush x:Key="ArtemisAccentBrush" Color="{StaticResource ArtemisAccentColor}"/>
+            <SolidColorBrush x:Key="ArtemisAccentSoftBrush" Color="{StaticResource ArtemisAccentSoftColor}"/>
+            <SolidColorBrush x:Key="ArtemisSuccessBrush" Color="{StaticResource ArtemisSuccessColor}"/>
+            <SolidColorBrush x:Key="ArtemisWarningBrush" Color="{StaticResource ArtemisWarningColor}"/>
+            <SolidColorBrush x:Key="ArtemisDangerBrush" Color="{StaticResource ArtemisDangerColor}"/>
+            <SolidColorBrush x:Key="ArtemisBorderBrush" Color="{StaticResource ArtemisBorderColor}"/>
+            <SolidColorBrush x:Key="ArtemisOverlayBrush" Color="{StaticResource ArtemisOverlayColor}"/>
+            <SolidColorBrush x:Key="ArtemisOnAccentBrush" Color="{StaticResource ArtemisOnAccentColor}"/>
+            <SolidColorBrush x:Key="ArtemisDangerSoftBrush" Color="#33E85D5D"/>
+            <SolidColorBrush x:Key="ArtemisSuccessSoftBrush" Color="#223DDC97"/>
+            <SolidColorBrush x:Key="ArtemisWarningSoftBrush" Color="#33F59E0B"/>
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Light">
+            <Color x:Key="ArtemisInkColor">#F3F6F9</Color>
+            <Color x:Key="ArtemisRaisedColor">#FFFFFF</Color>
+            <Color x:Key="ArtemisCardColor">#FFFFFF</Color>
+            <Color x:Key="ArtemisTextColor">#0A0E14</Color>
+            <Color x:Key="ArtemisMutedColor">#5B6B7C</Color>
+            <Color x:Key="ArtemisAccentColor">#0F766E</Color>
+            <Color x:Key="ArtemisAccentSoftColor">#1A0F766E</Color>
+            <Color x:Key="ArtemisSuccessColor">#0F9F6E</Color>
+            <Color x:Key="ArtemisWarningColor">#B45309</Color>
+            <Color x:Key="ArtemisDangerColor">#C53030</Color>
+            <Color x:Key="ArtemisBorderColor">#1A0A0E14</Color>
+            <Color x:Key="ArtemisOverlayColor">#660A0E14</Color>
+            <Color x:Key="ArtemisOnAccentColor">#F3F6F9</Color>
+            <Color x:Key="SystemAccentColor">#0F766E</Color>
+            <Color x:Key="SystemAccentColorDark1">#0C5F59</Color>
+            <Color x:Key="SystemAccentColorDark2">#0A4F4A</Color>
+            <Color x:Key="SystemAccentColorDark3">#083F3B</Color>
+            <Color x:Key="SystemAccentColorLight1">#2A9A91</Color>
+            <Color x:Key="SystemAccentColorLight2">#5BB8B0</Color>
+            <Color x:Key="SystemAccentColorLight3">#9ED6D1</Color>
+
+            <SolidColorBrush x:Key="ArtemisInkBrush" Color="{StaticResource ArtemisInkColor}"/>
+            <SolidColorBrush x:Key="ArtemisRaisedBrush" Color="{StaticResource ArtemisRaisedColor}"/>
+            <SolidColorBrush x:Key="ArtemisCardBrush" Color="{StaticResource ArtemisCardColor}"/>
+            <SolidColorBrush x:Key="ArtemisTextBrush" Color="{StaticResource ArtemisTextColor}"/>
+            <SolidColorBrush x:Key="ArtemisMutedBrush" Color="{StaticResource ArtemisMutedColor}"/>
+            <SolidColorBrush x:Key="ArtemisAccentBrush" Color="{StaticResource ArtemisAccentColor}"/>
+            <SolidColorBrush x:Key="ArtemisAccentSoftBrush" Color="{StaticResource ArtemisAccentSoftColor}"/>
+            <SolidColorBrush x:Key="ArtemisSuccessBrush" Color="{StaticResource ArtemisSuccessColor}"/>
+            <SolidColorBrush x:Key="ArtemisWarningBrush" Color="{StaticResource ArtemisWarningColor}"/>
+            <SolidColorBrush x:Key="ArtemisDangerBrush" Color="{StaticResource ArtemisDangerColor}"/>
+            <SolidColorBrush x:Key="ArtemisBorderBrush" Color="{StaticResource ArtemisBorderColor}"/>
+            <SolidColorBrush x:Key="ArtemisOverlayBrush" Color="{StaticResource ArtemisOverlayColor}"/>
+            <SolidColorBrush x:Key="ArtemisOnAccentBrush" Color="{StaticResource ArtemisOnAccentColor}"/>
+            <SolidColorBrush x:Key="ArtemisDangerSoftBrush" Color="#22C53030"/>
+            <SolidColorBrush x:Key="ArtemisSuccessSoftBrush" Color="#220F9F6E"/>
+            <SolidColorBrush x:Key="ArtemisWarningSoftBrush" Color="#22B45309"/>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+
+    <StreamGeometry x:Key="IconLock">M6,8 V7 A6,6 0 0 1 18,7 V8 H19.5 A1.5,1.5 0 0 1 21,9.5 V20.5 A1.5,1.5 0 0 1 19.5,22 H4.5 A1.5,1.5 0 0 1 3,20.5 V9.5 A1.5,1.5 0 0 1 4.5,8 H6 M8,8 V7 A4,4 0 0 1 16,7 V8 M12,13 A2,2 0 1 0 12,17 A2,2 0 1 0 12,13 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconUnlock">M6,8 V7 A6,6 0 0 1 18,7 V10 H16 V7 A4,4 0 0 0 8,7 V8 H19.5 A1.5,1.5 0 0 1 21,9.5 V20.5 A1.5,1.5 0 0 1 19.5,22 H4.5 A1.5,1.5 0 0 1 3,20.5 V9.5 A1.5,1.5 0 0 1 4.5,8 H6 M12,13 A2,2 0 1 0 12,17 A2,2 0 1 0 12,13 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconSettings">M12,8.5 A3.5,3.5 0 1 1 12,15.5 A3.5,3.5 0 1 1 12,8.5 M12,2 L13.7,5.2 L17.2,4.3 L19.7,7.7 L17.2,10.2 L19.7,13.8 L17.2,17.2 L13.7,16.3 L12,19.5 L10.3,16.3 L6.8,17.2 L4.3,13.8 L6.8,10.2 L4.3,7.7 L6.8,4.3 L10.3,5.2 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconFolder">M3,6.5 A1.5,1.5 0 0 1 4.5,5 H9 L11,7.5 H19.5 A1.5,1.5 0 0 1 21,9 V18.5 A1.5,1.5 0 0 1 19.5,20 H4.5 A1.5,1.5 0 0 1 3,18.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconWipe">M5,7 H19 M9,7 V5.5 A1.5,1.5 0 0 1 10.5,4 H13.5 A1.5,1.5 0 0 1 15,5.5 V7 M8,7 L8.6,19 A1.5,1.5 0 0 0 10.1,20.4 H13.9 A1.5,1.5 0 0 0 15.4,19 L16,7</StreamGeometry>
+    <StreamGeometry x:Key="IconSearch">M10.5,4 A6.5,6.5 0 1 1 10.5,17 A6.5,6.5 0 1 1 10.5,4 M15.5,15.5 L20,20</StreamGeometry>
+    <StreamGeometry x:Key="IconClose">M6,6 L18,18 M18,6 L6,18</StreamGeometry>
+    <StreamGeometry x:Key="IconReveal">M4,12 C6.5,7.5 9.5,5.5 12,5.5 C14.5,5.5 17.5,7.5 20,12 C17.5,16.5 14.5,18.5 12,18.5 C9.5,18.5 6.5,16.5 4,12 M12,9.5 A2.5,2.5 0 1 1 12,14.5 A2.5,2.5 0 1 1 12,9.5 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconFile">M7,3 H14 L19,8 V21 H7 Z M14,3 V8 H19</StreamGeometry>
+    <StreamGeometry x:Key="IconDrop">M12,3 L12,14 M8,10 L12,14 L16,10 M5,17 H19 V21 H5 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconEye">M2.5,12 C5,7.5 8.5,5.5 12,5.5 C15.5,5.5 19,7.5 21.5,12 C19,16.5 15.5,18.5 12,18.5 C8.5,18.5 5,16.5 2.5,12 M12,9 A3,3 0 1 1 12,15 A3,3 0 1 1 12,9 Z</StreamGeometry>
+    <StreamGeometry x:Key="IconEyeOff">M3,5 L21,21 M6,8 C4.4,9.4 3.1,11.1 2.5,12 C5,16.5 8.5,18.5 12,18.5 C13.3,18.5 14.6,18.2 15.8,17.7 M10,9.2 A3,3 0 0 1 15,13.2 M21.5,12 C20.6,10.5 19.4,9.2 18,8.2</StreamGeometry>
+</ResourceDictionary>

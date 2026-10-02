@@ -1,0 +1,178 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style Selector="Window">
+        <Setter Property="Background" Value="{DynamicResource ArtemisInkBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisTextBrush}"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style Selector="TextBlock.PageTitle">
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisTextBrush}"/>
+    </Style>
+
+    <Style Selector="TextBlock.SectionLabel">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisTextBrush}"/>
+    </Style>
+
+    <Style Selector="TextBlock.Helper">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisMutedBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <Style Selector="Border.Card">
+        <Setter Property="Background" Value="{DynamicResource ArtemisCardBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ArtemisBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="16"/>
+    </Style>
+
+    <Style Selector="Border.Callout">
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentSoftBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ArtemisAccentBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="12,10"/>
+    </Style>
+
+    <Style Selector="Border.DropZone">
+        <Setter Property="Background" Value="{DynamicResource ArtemisRaisedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ArtemisAccentBrush}"/>
+        <Setter Property="BorderThickness" Value="1.5"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="28"/>
+        <Setter Property="MinHeight" Value="132"/>
+    </Style>
+
+    <Style Selector="Border.DropZone.dragover">
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentSoftBrush}"/>
+    </Style>
+
+    <Style Selector="Border.TitleBar">
+        <Setter Property="Background" Value="{DynamicResource ArtemisRaisedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ArtemisBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="Padding" Value="10,0"/>
+    </Style>
+
+    <Style Selector="Border.FileChip">
+        <Setter Property="Background" Value="{DynamicResource ArtemisRaisedBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ArtemisBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="10,8"/>
+    </Style>
+
+    <Style Selector="Border.Toast">
+        <Setter Property="Background" Value="{DynamicResource ArtemisCardBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource ArtemisBorderBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="14,10"/>
+        <Setter Property="MinWidth" Value="260"/>
+        <Setter Property="MaxWidth" Value="360"/>
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="MinHeight" Value="36"/>
+    </Style>
+
+    <Style Selector="Button.Primary">
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisOnAccentBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="Button.Primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentBrush}"/>
+        <Setter Property="Opacity" Value="0.9"/>
+    </Style>
+
+    <Style Selector="Button.Danger">
+        <Setter Property="Background" Value="{DynamicResource ArtemisDangerSoftBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisDangerBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="Button.Ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisTextBrush}"/>
+    </Style>
+
+    <Style Selector="Button.Caption">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisMutedBrush}"/>
+        <Setter Property="Width" Value="40"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.Caption:pointerover">
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisTextBrush}"/>
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentSoftBrush}"/>
+    </Style>
+
+    <Style Selector="Button.Caption.close:pointerover">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Background" Value="{DynamicResource ArtemisDangerBrush}"/>
+    </Style>
+
+    <Style Selector="Button.NavItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisTextBrush}"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Margin" Value="8,2"/>
+    </Style>
+
+    <Style Selector="Button.NavItem:pointerover">
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentSoftBrush}"/>
+    </Style>
+
+    <Style Selector="Button.NavItem.selected">
+        <Setter Property="Background" Value="{DynamicResource ArtemisAccentSoftBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisAccentBrush}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="Button.Icon">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="6"/>
+        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="Width" Value="32"/>
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="MinHeight" Value="36"/>
+        <Setter Property="Padding" Value="10,6"/>
+    </Style>
+
+    <Style Selector="ProgressBar">
+        <Setter Property="MinHeight" Value="6"/>
+        <Setter Property="Foreground" Value="{DynamicResource ArtemisAccentBrush}"/>
+    </Style>
+
+    <Style Selector="ListBox.CommandList">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style Selector="ListBoxItem.CommandList">
+        <Setter Property="Padding" Value="10,8"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Margin" Value="0,2"/>
+    </Style>
+</Styles>

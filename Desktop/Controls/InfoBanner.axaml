@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Artemis.Desktop.Controls.InfoBanner"
+             x:Name="Root"
+             IsVisible="{Binding #Root.IsBannerVisible}">
+    <Border x:Name="Banner"
+            CornerRadius="10"
+            Padding="12,10"
+            BorderThickness="1">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="{Binding #Root.Message}"
+                       TextWrapping="Wrap"
+                       VerticalAlignment="Center"/>
+            <Button Grid.Column="1"
+                    Classes="Ghost"
+                    Margin="12,0,0,0"
+                    Content="{Binding #Root.ActionContent}"
+                    Command="{Binding #Root.ActionCommand}"
+                    IsVisible="{Binding #Root.ShowAction}"/>
+        </Grid>
+    </Border>
+</UserControl>

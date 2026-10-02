@@ -28,6 +28,8 @@
 .copilot/
 *.copilotindex
 
+**CursorPlans
+
 # --- Documentation ---
 SecureShare_Guide.md
 GEMINI.md

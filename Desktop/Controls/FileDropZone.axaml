@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Artemis.Desktop.Controls.FileDropZone"
+             x:Name="Root"
+             DragDrop.AllowDrop="True">
+    <Border x:Name="Zone"
+            Classes="DropZone"
+            Cursor="Hand"
+            AutomationProperties.Name="{Binding #Root.Placeholder}">
+        <StackPanel Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <PathIcon Data="{DynamicResource IconDrop}"
+                      Width="28"
+                      Height="28"
+                      Foreground="{DynamicResource ArtemisAccentBrush}"/>
+            <TextBlock Text="{Binding #Root.Placeholder}"
+                       HorizontalAlignment="Center"
+                       FontWeight="SemiBold"
+                       TextWrapping="Wrap"/>
+            <TextBlock Text="or click to browse"
+                       Classes="Helper"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,66 +1,89 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Artemis.Desktop.ViewModels"
+             xmlns:controls="using:Artemis.Desktop.Controls"
+             xmlns:models="using:Artemis.Desktop.Models"
              xmlns:conv="using:Avalonia.Data.Converters"
-             xmlns:services="using:Artemis.Desktop.Services"
              x:Class="Artemis.Desktop.Views.EncryptionView"
              x:DataType="vm:EncryptionViewModel">
 
-    <StackPanel Margin="20" Spacing="15">
+    <StackPanel MaxWidth="720" Spacing="16">
+        <TextBlock Text="Encrypt files" Classes="PageTitle"/>
+        <TextBlock Text="Lock one or more files locally. The password never leaves this device."
+                   Classes="Helper"/>
 
-        <TextBlock Text="Encrypt a File"
-                   FontSize="24" FontWeight="Bold" />
-
-        <!-- Security notice -->
-        <Border Background="#1E3A5F" CornerRadius="4" Padding="12">
-            <TextBlock Text="Your password never leaves this device. All encryption is performed locally."
-                       Foreground="White"
-                       TextWrapping="Wrap" />
+        <Border Classes="Callout">
+            <TextBlock Text="All encryption runs on this machine. Nothing is uploaded."
+                       TextWrapping="Wrap"/>
         </Border>
 
-        <!-- File selection -->
-        <StackPanel Spacing="8">
-            <Button Content="Select File"
-                    Command="{Binding SelectFileCommand}" />
-            <TextBlock Text="{Binding SelectedFileName, TargetNullValue='No file selected'}"
-                       TextWrapping="Wrap" />
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Files" Classes="SectionLabel"/>
+                <controls:FileDropZone Placeholder="Drop files to encrypt"
+                                       ClickCommand="{Binding SelectFileCommand}"
+                                       FilesDroppedCommand="{Binding AddDroppedFilesCommand}"
+                                       IsEnabled="{Binding !IsEncrypting}"/>
+                <controls:FileChipList Files="{Binding SelectedFiles}"
+                                       RemoveCommand="{Binding RemoveFileCommand}"
+                                       IsVisible="{Binding HasFiles}"/>
+
+                <StackPanel Spacing="6" IsVisible="{Binding HasRecentFiles}">
+                    <TextBlock Text="Recent" Classes="Helper"/>
+                    <ItemsControl ItemsSource="{Binding RecentFiles}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:RecentFileEntry">
+                                <Button Classes="Ghost"
+                                        Margin="0,0,8,4"
+                                        Content="{Binding FileName}"
+                                        Command="{Binding $parent[UserControl].((vm:EncryptionViewModel)DataContext).AddRecentFileCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{Binding Path}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Password" Classes="SectionLabel"/>
+                <controls:SecurePasswordBox SecurePassword="{Binding Password, Mode=TwoWay}"
+                                            Watermark="Enter password"/>
+                <controls:SecurePasswordBox SecurePassword="{Binding PasswordConfirm, Mode=TwoWay}"
+                                            Watermark="Confirm password"/>
+                <TextBlock Text="{Binding PasswordError}"
+                           Foreground="{DynamicResource ArtemisDangerBrush}"
+                           IsVisible="{Binding PasswordError, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}"/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="8" IsVisible="{Binding ShowProgress}">
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressValue}"/>
+            <TextBlock Text="{Binding StatusMessage}" Classes="Helper"/>
         </StackPanel>
 
-        <!-- Password inputs -->
-        <StackPanel Spacing="8">
-            <TextBlock Text="Password" />
-            <TextBox PasswordChar="*"
-                     services:SecurityHelper.SecurePassword="{Binding Password, Mode=TwoWay}"
-                     Watermark="Enter password" />
+        <controls:InfoBanner Message="{Binding BannerMessage}"
+                             Kind="{Binding BannerKind}"
+                             ActionContent="Reveal in folder"
+                             ActionCommand="{Binding RevealOutputCommand}"/>
 
-            <TextBlock Text="Confirm Password" />
-            <TextBox PasswordChar="*"
-                     services:SecurityHelper.SecurePassword="{Binding PasswordConfirm, Mode=TwoWay}"
-                     Watermark="Confirm password" />
-
-            <!-- Password error -->
-            <TextBlock Text="{Binding PasswordError}"
-                       Foreground="Red"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding PasswordError, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="Primary"
+                    Content="Encrypt"
+                    Command="{Binding EncryptCommand}"
+                    AutomationProperties.Name="Encrypt files"/>
+            <Button Classes="Ghost"
+                    Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsEncrypting}"
+                    AutomationProperties.Name="Cancel encryption"/>
         </StackPanel>
-
-        <!-- Progress section -->
-        <StackPanel Spacing="6" IsVisible="{Binding ShowProgress}">
-            <ProgressBar Minimum="0" Maximum="100"
-                         Value="{Binding ProgressValue}" />
-            <TextBlock Text="{Binding StatusMessage}" />
-        </StackPanel>
-
-        <!-- Error display -->
-        <TextBlock Text="{Binding ErrorMessage}"
-                   Foreground="Red"
-                   TextWrapping="Wrap"
-                   IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-
-        <!-- Encrypt button -->
-        <Button Content="Encrypt"
-                Command="{Binding EncryptCommand}" />
-
     </StackPanel>
 </UserControl>

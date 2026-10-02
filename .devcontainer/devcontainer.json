@@ -1,0 +1,43 @@
+{
+  "name": "Omni-Crypto Workspace",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "10.0"
+    },
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "17",
+      "installGradle": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts",
+      "nodeGypDependencies": true
+    },
+    "ghcr.io/devcontainers/features/desktop-lite:1": {
+      "password": "dev"
+    }
+  },
+  "capAdd": ["SYS_PTRACE"],
+  "securityOpt": ["seccomp=unconfined"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "AvaloniaTeam.vscode-avalonia",
+        "fwcd.kotlin",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "forwardPorts": [6080],
+  "portsAttributes": {
+    "6080": {
+      "label": "Avalonia GUI (noVNC)",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "remoteUser": "vscode"
+}

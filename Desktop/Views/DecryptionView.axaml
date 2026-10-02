@@ -1,55 +1,83 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Artemis.Desktop.ViewModels"
-             xmlns:conv="using:Avalonia.Data.Converters"
-             xmlns:services="using:Artemis.Desktop.Services"
+             xmlns:controls="using:Artemis.Desktop.Controls"
+             xmlns:models="using:Artemis.Desktop.Models"
              x:Class="Artemis.Desktop.Views.DecryptionView"
              x:DataType="vm:DecryptionViewModel">
 
-    <StackPanel Margin="20" Spacing="15">
+    <StackPanel MaxWidth="720" Spacing="16">
+        <TextBlock Text="Decrypt a file" Classes="PageTitle"/>
+        <TextBlock Text="Restore an Artemis .enc file using the password that locked it."
+                   Classes="Helper"/>
 
-        <TextBlock Text="Decrypt a File"
-                   FontSize="24" FontWeight="Bold" />
-
-        <!-- Security notice -->
-        <Border Background="#1E3A5F" CornerRadius="4" Padding="12">
-            <TextBlock Text="Your password never leaves this device. All decryption is performed locally."
-                       Foreground="White"
-                       TextWrapping="Wrap" />
+        <Border Classes="Callout">
+            <TextBlock Text="All decryption runs on this machine. Nothing is uploaded."
+                       TextWrapping="Wrap"/>
         </Border>
 
-        <!-- File selection -->
-        <StackPanel Spacing="8">
-            <Button Content="Select File"
-                    Command="{Binding SelectFileCommand}" />
-            <TextBlock Text="{Binding SelectedFileName, TargetNullValue='No file selected'}"
-                       TextWrapping="Wrap" />
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Encrypted file" Classes="SectionLabel"/>
+                <controls:FileDropZone Placeholder="Drop an .enc file to decrypt"
+                                       ClickCommand="{Binding SelectFileCommand}"
+                                       FilesDroppedCommand="{Binding AddDroppedFilesCommand}"
+                                       IsEnabled="{Binding !IsDecrypting}"/>
+                <controls:FileChipList Files="{Binding SelectedFiles}"
+                                       RemoveCommand="{Binding RemoveFileCommand}"
+                                       IsVisible="{Binding HasFile}"/>
+
+                <StackPanel Spacing="6" IsVisible="{Binding HasRecentFiles}">
+                    <TextBlock Text="Recent" Classes="Helper"/>
+                    <ItemsControl ItemsSource="{Binding RecentFiles}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:RecentFileEntry">
+                                <Button Classes="Ghost"
+                                        Margin="0,0,8,4"
+                                        Content="{Binding FileName}"
+                                        Command="{Binding $parent[UserControl].((vm:DecryptionViewModel)DataContext).AddRecentFileCommand}"
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{Binding Path}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Password" Classes="SectionLabel"/>
+                <controls:SecurePasswordBox SecurePassword="{Binding Password, Mode=TwoWay}"
+                                            Watermark="Enter password"/>
+            </StackPanel>
+        </Border>
+
+        <StackPanel Spacing="8" IsVisible="{Binding ShowProgress}">
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressValue}"/>
+            <TextBlock Text="{Binding StatusMessage}" Classes="Helper"/>
         </StackPanel>
 
-        <!-- Password input -->
-        <StackPanel Spacing="8">
-            <TextBlock Text="Password" />
-            <TextBox PasswordChar="*"
-                     services:SecurityHelper.SecurePassword="{Binding Password, Mode=TwoWay}"
-                     Watermark="Enter password" />
+        <controls:InfoBanner Message="{Binding BannerMessage}"
+                             Kind="{Binding BannerKind}"
+                             ActionContent="Reveal in folder"
+                             ActionCommand="{Binding RevealOutputCommand}"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Classes="Primary"
+                    Content="Decrypt"
+                    Command="{Binding DecryptCommand}"
+                    AutomationProperties.Name="Decrypt file"/>
+            <Button Classes="Ghost"
+                    Content="Cancel"
+                    Command="{Binding CancelCommand}"
+                    IsVisible="{Binding IsDecrypting}"
+                    AutomationProperties.Name="Cancel decryption"/>
         </StackPanel>
-
-        <!-- Progress section -->
-        <StackPanel Spacing="6" IsVisible="{Binding ShowProgress}">
-            <ProgressBar Minimum="0" Maximum="100"
-                         Value="{Binding ProgressValue}" />
-            <TextBlock Text="{Binding StatusMessage}" />
-        </StackPanel>
-
-        <!-- Error display -->
-        <TextBlock Text="{Binding ErrorMessage}"
-                   Foreground="Red"
-                   TextWrapping="Wrap"
-                   IsVisible="{Binding ErrorMessage, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
-
-        <!-- Decrypt button -->
-        <Button Content="Decrypt"
-                Command="{Binding DecryptCommand}" />
-
     </StackPanel>
 </UserControl>

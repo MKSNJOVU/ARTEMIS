@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="using:Artemis.Desktop.Models"
+             x:Class="Artemis.Desktop.Controls.FileChipList"
+             x:Name="Root">
+    <ItemsControl ItemsSource="{Binding #Root.Files}">
+        <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+                <StackPanel Spacing="6"/>
+            </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="models:SelectedFileItem">
+                <Border Classes="FileChip">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <PathIcon Data="{DynamicResource IconFile}"
+                                  Width="16"
+                                  Height="16"
+                                  Margin="0,0,8,0"
+                                  VerticalAlignment="Center"
+                                  Foreground="{DynamicResource ArtemisAccentBrush}"/>
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding DirectoryName}" Classes="Helper" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        <Button Grid.Column="2"
+                                Classes="Icon"
+                                Command="{Binding #Root.RemoveCommand}"
+                                CommandParameter="{Binding}"
+                                ToolTip.Tip="Remove file"
+                                AutomationProperties.Name="Remove file">
+                            <PathIcon Data="{DynamicResource IconClose}" Width="12" Height="12"/>
+                        </Button>
+                    </Grid>
+                </Border>
+            </DataTemplate>
+        </ItemsControl.ItemTemplate>
+    </ItemsControl>
+</UserControl>

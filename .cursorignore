@@ -1,0 +1,119 @@
+# .cursorignore
+
+# ==========================================
+# C# & .NET (ASP.NET Core MVC, WPF)
+# ==========================================
+bin/
+obj/
+.vs/
+TestResults/
+*.user
+*.suo
+
+# ==========================================
+# Rust & Cargo
+# ==========================================
+target/
+**/*.rs.bk
+
+# ==========================================
+# Databases 
+# ==========================================
+# Block local databases but allow the AI to read schema/migration scripts (.sql)
+*.sqlite
+*.sqlite3
+*.db
+*.mdf
+*.ldf
+
+# ==========================================
+# Diagnostics & Large Files
+# ==========================================
+# Prevent the AI from attempting to index massive diagnostic files
+*.dmp
+*.mdmp
+*.log
+
+# ==========================================
+# Secrets & Azure Configurations
+# ==========================================
+# Whitelist templates so AI knows the environment shape, but block actual secrets
+.env
+.env.local
+local.settings.json
+appsettings.json
+appsettings.Development.json
+appsettings.*.local.json
+*.secrets.json
+!*.env.example
+!*.env.template
+
+# .cursorignore
+
+# ==========================================
+# Local Secrets & Cryptography
+# ==========================================
+# Strictly block AI access to local AES-GCM keys, 
+# Argon2id peppers, keystores, and environment variables.
+*.key
+*.pem
+*.pfx
+*.p12
+*.jks
+*.keystore
+secrets.json
+appsettings.Development.json
+.env
+.env.*
+!.env.example
+!.env.template
+
+# ==========================================
+# C# .NET & Avalonia Desktop
+# ==========================================
+bin/
+obj/
+TestResults/
+.vs/
+*.user
+*.suo
+# Ignore auto-generated Avalonia asset files
+**/*.g.cs
+
+# ==========================================
+# Kotlin & Android Mobile
+# ==========================================
+.gradle/
+.idea/
+build/
+*/build/
+*.apk
+*.aab
+# Ignore compiled JNI/C-bindings for native crypto operations
+.cxx/
+*.so
+*.dylib
+
+# ==========================================
+# JavaScript & TypeScript Web
+# ==========================================
+# Prevent Cursor from wasting context limits on third-party code
+node_modules/
+dist/
+out/
+.next/
+.nuxt/
+coverage/
+# Ignore heavy lockfiles (these are useless for AI context)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# ==========================================
+# General Project Noise
+# ==========================================
+*.log
+npm-debug.log*
+yarn-error.log*
+**/.DS_Store
