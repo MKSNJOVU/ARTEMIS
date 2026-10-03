@@ -177,9 +177,10 @@ public partial class EncryptionViewModel : ViewModelBase
 
             if (string.IsNullOrWhiteSpace(location))
             {
-                StatusMessage = "Encryption cancelled.";
+                FinishProgress();
+                BannerKind = NotificationKind.Warning;
+                BannerMessage = "Encryption cancelled.";
                 CurrentState = OperationState.Idle;
-                ShowProgress = false;
                 return;
             }
 
@@ -195,6 +196,7 @@ public partial class EncryptionViewModel : ViewModelBase
 
                 if (!File.Exists(file.FullPath))
                 {
+                    FinishProgress();
                     BannerKind = NotificationKind.Error;
                     BannerMessage = $"Unable to read {file.FileName}. It may have been moved or deleted.";
                     CurrentState = OperationState.Faulted;
@@ -226,32 +228,33 @@ public partial class EncryptionViewModel : ViewModelBase
                 ProgressValue = currentProgress;
             }
 
-            ProgressValue = 100;
+            FinishProgress();
             if (completed == 0)
             {
-                StatusMessage = "No files were encrypted.";
+                BannerKind = NotificationKind.Warning;
+                BannerMessage = "No files were encrypted.";
                 CurrentState = OperationState.Idle;
                 return;
             }
 
-            StatusMessage = completed == 1 ? "Encryption complete." : $"Encrypted {completed} files.";
             CurrentState = OperationState.Completed;
             BannerKind = NotificationKind.Success;
-            BannerMessage = StatusMessage;
-            _notificationService.Show(StatusMessage, NotificationKind.Success);
+            BannerMessage = completed == 1 ? "Encryption complete." : $"Encrypted {completed} files.";
+            _notificationService.Show(BannerMessage, NotificationKind.Success);
             _clipboardService.ScheduleClear(_settingsService.Current.ClipboardAutoWipeSeconds);
             RefreshRecentFiles();
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "Encryption cancelled.";
+            FinishProgress();
             BannerKind = NotificationKind.Warning;
-            BannerMessage = StatusMessage;
+            BannerMessage = "Encryption cancelled.";
             CurrentState = OperationState.Idle;
             DeletePartial(currentSavePath);
         }
         catch (Exception ex)
         {
+            FinishProgress();
             BannerKind = NotificationKind.Error;
             BannerMessage = $"Encryption failed: {ex.Message}";
             CurrentState = OperationState.Faulted;
@@ -315,12 +318,17 @@ public partial class EncryptionViewModel : ViewModelBase
         EncryptCommand.NotifyCanExecuteChanged();
     }
 
-    private void ResetTransientState()
+    private void FinishProgress()
     {
-        CurrentState = OperationState.Idle;
         ShowProgress = false;
         ProgressValue = 0;
         StatusMessage = string.Empty;
+    }
+
+    private void ResetTransientState()
+    {
+        CurrentState = OperationState.Idle;
+        FinishProgress();
         BannerMessage = null;
     }
 

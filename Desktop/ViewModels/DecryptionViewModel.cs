@@ -169,6 +169,7 @@ public partial class DecryptionViewModel : ViewModelBase
 
             if (!File.Exists(savePath))
             {
+                FinishProgress();
                 BannerKind = NotificationKind.Error;
                 BannerMessage = "The selected file is no longer available.";
                 CurrentState = OperationState.Faulted;
@@ -182,9 +183,10 @@ public partial class DecryptionViewModel : ViewModelBase
             decryptDestination = await _filePickerService.SaveFileAsync(suggestedFileName, "Save decrypted file", startPath: startPath);
             if (string.IsNullOrWhiteSpace(decryptDestination))
             {
-                StatusMessage = "Decryption cancelled.";
+                FinishProgress();
+                BannerKind = NotificationKind.Warning;
+                BannerMessage = "Decryption cancelled.";
                 CurrentState = OperationState.Idle;
-                ShowProgress = false;
                 return;
             }
 
@@ -193,9 +195,10 @@ public partial class DecryptionViewModel : ViewModelBase
                 bool overwrite = await _dialogService.ShowConfirmationAsync($"The file {Path.GetFileName(decryptDestination)} already exists. Overwrite?");
                 if (!overwrite)
                 {
-                    StatusMessage = "Decryption cancelled.";
+                    FinishProgress();
+                    BannerKind = NotificationKind.Warning;
+                    BannerMessage = "Decryption cancelled.";
                     CurrentState = OperationState.Idle;
-                    ShowProgress = false;
                     return;
                 }
             }
@@ -210,28 +213,28 @@ public partial class DecryptionViewModel : ViewModelBase
                 await _encryptionService.DecryptAsync(sourceStream, destinationStream, Password!);
             }
 
-            ProgressValue = 100;
-            StatusMessage = "Decryption complete.";
+            FinishProgress();
             CurrentState = OperationState.Completed;
             BannerKind = NotificationKind.Success;
-            BannerMessage = StatusMessage;
+            BannerMessage = "Decryption complete.";
             _lastOutputPath = decryptDestination;
             _recentFilesService.Add(savePath, RecentKind);
             _settingsService.Update(settings => settings.LastOpenFolder = Path.GetDirectoryName(decryptDestination));
-            _notificationService.Show(StatusMessage, NotificationKind.Success);
+            _notificationService.Show(BannerMessage, NotificationKind.Success);
             _clipboardService.ScheduleClear(_settingsService.Current.ClipboardAutoWipeSeconds);
             RefreshRecentFiles();
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "Decryption cancelled.";
+            FinishProgress();
             BannerKind = NotificationKind.Warning;
-            BannerMessage = StatusMessage;
+            BannerMessage = "Decryption cancelled.";
             CurrentState = OperationState.Idle;
             DeletePartial(decryptDestination);
         }
         catch (CryptographicException)
         {
+            FinishProgress();
             BannerKind = NotificationKind.Error;
             BannerMessage = "Decryption failed. Wrong password or corrupted file.";
             CurrentState = OperationState.Faulted;
@@ -239,6 +242,7 @@ public partial class DecryptionViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            FinishProgress();
             BannerKind = NotificationKind.Error;
             BannerMessage = $"An error occurred: {ex.Message}";
             CurrentState = OperationState.Faulted;
@@ -300,12 +304,17 @@ public partial class DecryptionViewModel : ViewModelBase
         RecentFiles = new ObservableCollection<RecentFileEntry>(_recentFilesService.Get(RecentKind));
     }
 
-    private void ResetTransientState(bool keepSelection)
+    private void FinishProgress()
     {
-        CurrentState = OperationState.Idle;
         ShowProgress = false;
         ProgressValue = 0;
         StatusMessage = string.Empty;
+    }
+
+    private void ResetTransientState(bool keepSelection)
+    {
+        CurrentState = OperationState.Idle;
+        FinishProgress();
         BannerMessage = null;
         if (!keepSelection)
             SelectedFiles.Clear();
