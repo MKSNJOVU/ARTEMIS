@@ -23,7 +23,7 @@
 *.user
 *.suo
 *.log
-
+**/publish/
 # --- AI / Copilot ---
 .copilot/
 *.copilotindex
